@@ -1,0 +1,5 @@
+scripts/node_modules/
+.swarm/
+logs/
+*.log
+.DS_Store

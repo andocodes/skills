@@ -1,8 +1,8 @@
 # Swarm Skill
 
-`swarm` is a local orchestration skill for decomposing larger work into isolated agent lanes.
+`swarm` breaks larger work into smaller agent tasks. Each task gets its own git worktree, prompt, and handoff file.
 
-The skill is host-agnostic at the artifact layer:
+It can be used from Cursor, Claude Code, or Codex because the important files are the same everywhere:
 
 - `plan.json` defines the task graph.
 - One git worktree isolates each task.
@@ -12,11 +12,11 @@ The skill is host-agnostic at the artifact layer:
 
 ## Install
 
-Clone this repository once, then symlink it into each host that should expose the skill.
+Clone this repository anywhere you keep local tools, then run the installer.
 
 ```bash
-git clone git@github.com:andocodes/skills.git ~/Projects/skills
-cd ~/Projects/skills
+git clone git@github.com:andocodes/skills.git <your-tools-folder>/skills
+cd <your-tools-folder>/skills
 ./install.sh
 ```
 

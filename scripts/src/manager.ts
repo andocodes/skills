@@ -66,6 +66,7 @@ export interface RunLoopOptions {
 export interface VisibleTaskLaunch {
   task: string;
   executor: Executor;
+  cursorSubagentType?: "generalPurpose";
   branch: string;
   worktreePath: string;
   repo: string;
@@ -427,6 +428,8 @@ ${executorInstructions(taskState.executor ?? this.plan.executor)}
     return {
       task: task.name,
       executor: taskState.executor ?? this.plan.executor,
+      cursorSubagentType:
+        (taskState.executor ?? this.plan.executor) === "cursor-visible" ? "generalPurpose" : undefined,
       branch: taskState.branch,
       worktreePath: taskState.worktreePath,
       repo: taskState.repo ?? taskRepo.name,
@@ -868,7 +871,8 @@ function executorInstructions(executor: Executor): string {
     case "cursor-visible":
       return [
         "Executor: cursor-visible",
-        "- You are a Cursor subagent launched from the parent chat, so your reasoning and tool activity are visible to the operator.",
+        "- You are a Cursor general-purpose subagent launched from the parent chat, so your reasoning and tool activity are visible to the operator.",
+        "- The selected swarm agent is a persona already embedded in this prompt. Do not treat it as a Cursor subagent_type.",
       ].join("\n");
     case "claude-cli":
       return [
@@ -894,7 +898,7 @@ function executorInstructions(executor: Executor): string {
 function launchInstruction(executor: Executor, promptPath: string): string {
   switch (executor) {
     case "cursor-visible":
-      return `Launch a visible Cursor subagent with the prompt in ${promptPath}.`;
+      return `Launch a visible Cursor generalPurpose subagent with the prompt in ${promptPath}; do not use the swarm agent name as subagent_type.`;
     case "claude-cli":
       return `Open Claude Code CLI in the worktree and provide the prompt from ${promptPath}.`;
     case "codex-cli":

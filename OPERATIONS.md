@@ -4,7 +4,7 @@ This file keeps long-running behavior out of `SKILL.md`.
 
 ## Visible Runs
 
-Default `/swarm` should use `cursor-visible`: Cursor `generalPurpose` subagents launched from the parent chat.
+Default `/swarm` should use `cursor-visible`: Cursor subagents launched from the parent chat.
 
 Use:
 
@@ -24,9 +24,9 @@ The visible subagent writes `.swarm/<rootSlug>/handoffs/<task>.md`. Record it wi
 bun ~/.cursor/skills/swarm/scripts/cli.ts complete .swarm/<rootSlug> <task>
 ```
 
-Use `cursor-visible` when the operator is actively working in Cursor and wants to inspect worker reasoning, tool calls, and blockers in the chat UI. The task `agent` is a persona inside the prompt, not a Cursor `subagent_type`; launch `generalPurpose` unless a future runtime explicitly advertises a compatible predefined type.
+Use `cursor-visible` when the operator is actively working in Cursor and wants to inspect worker reasoning, tool calls, and blockers in the chat UI. `prepare` returns `cursorSubagentCandidates`: try the task `agent` first if it is available in this Cursor session, then fall back to `generalPurpose`.
 
-Use `claude-cli` or `codex-cli` when the same swarm task should run in a terminal-visible lane. Those executors still use the same worktree, prompt file, handoff file, and `complete` step; they just do not appear as native Cursor subagent chats.
+Use `claude-cli` or `codex-cli` when the same swarm task should run in a terminal-visible lane. If that host has a matching native agent/persona, use it; otherwise run the default CLI session with the prompt file. Those executors still use the same worktree, prompt file, handoff file, and `complete` step; they just do not appear as native Cursor subagent chats.
 
 ## Headless Overnight Runs
 

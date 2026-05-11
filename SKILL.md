@@ -22,9 +22,9 @@ disable-model-invocation: true
 ## Core Rules
 
 1. The planner writes `plan.json`. It does not code.
-2. By default, workers and verifiers use `cursor-visible`: Cursor's native `generalPurpose` subagent, visible in the current chat.
+2. By default, workers and verifiers use `cursor-visible`: a native Cursor subagent, visible in the current chat.
 3. Workers communicate only through handoffs and parent-mediated inbox notes.
-4. Tasks may select `.cursor/agents/*.md` or `~/.cursor/agents/*.md` personas. These are prompt personas, not Cursor `subagent_type` values.
+4. Tasks may select `.cursor/agents/*.md` or `~/.cursor/agents/*.md` personas. Use the matching native runtime agent only when the current host exposes it; otherwise use the host default and rely on the embedded persona prompt.
 5. Universal execution is an adapter hint, not a new artifact model: `cursor-visible`, `cursor-sdk`, `claude-cli`, or `codex-cli`.
 6. No cloud clone, Slack bridge, automatic PR creation, or automatic merging in v1.
 
@@ -46,7 +46,7 @@ bun ~/.cursor/skills/swarm/scripts/cli.ts init "<goal>"
 bun ~/.cursor/skills/swarm/scripts/cli.ts prepare .swarm/<rootSlug> <task>
 ```
 
-5. Read the returned `promptPath`, then launch the returned `executor`. `cursor-visible` uses a native Cursor `generalPurpose` subagent with the persona already embedded in the prompt; do not pass the task `agent` as `subagent_type`. `claude-cli` and `codex-cli` use terminal-visible lanes.
+5. Read the returned `promptPath`, then launch the returned `executor`. For `cursor-visible`, use the first available `cursorSubagentCandidates` entry from `prepare` output. For `claude-cli` and `codex-cli`, use a matching native CLI agent/persona if that host supports one; otherwise run the default CLI session with the prompt file.
 6. After the visible subagent writes `.swarm/<rootSlug>/handoffs/<task>.md`, record it:
 
 ```bash
@@ -105,7 +105,7 @@ Prefer fewer, broader workers. Add verifiers only when independent checking has 
 
 Executors:
 
-- `cursor-visible`: native Cursor `generalPurpose` subagent in the current chat. The task `agent` is injected into the prompt as a persona.
+- `cursor-visible`: native Cursor subagent in the current chat. Try the task `agent` as `subagent_type` only if it is available in this session; fall back to `generalPurpose`.
 - `claude-cli`: terminal-visible Claude Code CLI lane using the same prompt/handoff files.
 - `codex-cli`: terminal-visible Codex CLI lane using the same prompt/handoff files.
 - `cursor-sdk`: headless Cursor SDK lane for unattended runs.
@@ -147,7 +147,7 @@ Verifiers use `## Verification` with one of: `passed`, `failed`, `blocked`.
 - `kickoff <goal> --repo-mode siblings`: discover child git repos in a side-by-side workspace and require task-level `repo`.
 - `kickoff <goal> --base-ref <ref>`: run all task worktrees from a committed branch, tag, or SHA.
 - `auth`: validate `CURSOR_API_KEY` with the Cursor SDK and print available model ids.
-- `prepare <workspace> <task>`: create the task worktree, mark it running, and write `logs/<task>-prompt.md` plus launch instructions for the selected executor.
+- `prepare <workspace> <task>`: create the task worktree, mark it running, and write `logs/<task>-prompt.md` plus launch instructions and runtime agent candidates for the selected executor.
 - `complete <workspace> <task>`: read `handoffs/<task>.md`, parse the structured handoff, and update `state.json`.
 - `run <workspace>`: headless SDK mode for overnight runs. It spawns ready tasks, recovers running SDK runs, waits for handoffs, and updates `state.json`. Use `--max-runtime-sec` for checkpointing and `--task-timeout-sec` to fail stuck SDK runs with a handoff.
 - `status <workspace>`: print task counts and attention items.

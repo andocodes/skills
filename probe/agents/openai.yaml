@@ -1,0 +1,4 @@
+interface:
+  display_name: "Probe"
+  short_description: "Pressure-test plans with focused decision probes"
+  default_prompt: "Use $probe to pressure-test this plan with focused questions and a visible decision path."

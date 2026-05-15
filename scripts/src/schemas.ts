@@ -1,6 +1,23 @@
 import { z } from "zod";
 
 export const TASK_NAME_RE = /^[a-z0-9-]+$/;
+export const executorValues = [
+  "cursor-visible",
+  "cursor-sdk",
+  "claude-native",
+  "claude-cli",
+  "codex-native",
+  "codex-cli",
+  "pi-cli",
+] as const;
+export const isolationModeValues = ["worktree", "container", "readonly"] as const;
+export const isolationRuntimeValues = ["docker", "podman"] as const;
+export const isolationNetworkValues = ["restricted", "none", "inherit"] as const;
+
+export const executorDescription = executorValues.join(", ");
+export const isolationModeDescription = isolationModeValues.join(", ");
+export const isolationRuntimeDescription = isolationRuntimeValues.join(", ");
+export const isolationNetworkDescription = isolationNetworkValues.join(", ");
 
 const taskName = z.string().regex(TASK_NAME_RE, "must be kebab-case ASCII");
 const nonEmpty = z.string().min(1);
@@ -11,18 +28,10 @@ const profileRef = z
   .regex(/^[A-Za-z0-9._@:/-]+$/, "must be a named local profile, not an inline secret");
 
 export const taskTypeSchema = z.enum(["worker", "verifier"]);
-export const executorSchema = z.enum([
-  "cursor-visible",
-  "cursor-sdk",
-  "claude-native",
-  "claude-cli",
-  "codex-native",
-  "codex-cli",
-  "pi-cli",
-]);
-export const isolationModeSchema = z.enum(["worktree", "container", "readonly"]);
-export const isolationRuntimeSchema = z.enum(["docker", "podman"]);
-export const isolationNetworkSchema = z.enum(["restricted", "none", "inherit"]);
+export const executorSchema = z.enum(executorValues);
+export const isolationModeSchema = z.enum(isolationModeValues);
+export const isolationRuntimeSchema = z.enum(isolationRuntimeValues);
+export const isolationNetworkSchema = z.enum(isolationNetworkValues);
 export const isolationSchema = z
   .object({
     mode: isolationModeSchema.default("worktree"),

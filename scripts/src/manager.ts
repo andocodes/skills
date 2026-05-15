@@ -1086,29 +1086,35 @@ function nativeAgentCandidates(agent: string | undefined): string[] {
 function launchInstruction(executor: Executor, promptPath: string, agent: string | undefined): string {
   switch (executor) {
     case "cursor-visible":
-      return agent
-        ? `If "${agent}" is an available Cursor subagent_type in this session, launch it with the prompt in ${promptPath}; otherwise launch generalPurpose. The persona is embedded in the prompt either way.`
-        : `Launch a visible Cursor generalPurpose subagent with the prompt in ${promptPath}.`;
+      if (agent) {
+        return `If "${agent}" is an available Cursor subagent_type in this session, launch it with the prompt in ${promptPath}; otherwise launch generalPurpose. The persona is embedded in the prompt either way.`;
+      }
+      return `Launch a visible Cursor generalPurpose subagent with the prompt in ${promptPath}.`;
     case "claude-cli":
-      return agent
-        ? `Open Claude Code CLI in the worktree. If a matching Claude subagent/persona named "${agent}" is available, use it; otherwise provide the prompt from ${promptPath} to the default Claude CLI session.`
-        : `Open Claude Code CLI in the worktree and provide the prompt from ${promptPath}.`;
+      if (agent) {
+        return `Open Claude Code CLI in the worktree. If a matching Claude subagent/persona named "${agent}" is available, use it; otherwise provide the prompt from ${promptPath} to the default Claude CLI session.`;
+      }
+      return `Open Claude Code CLI in the worktree and provide the prompt from ${promptPath}.`;
     case "claude-native":
-      return agent
-        ? `Launch a Claude Code native background agent/task for this lane. If a matching native subagent/persona named "${agent}" is available, use it; otherwise use the default native agent. Give it the prompt from ${promptPath}; do not start Claude via Bash.`
-        : `Launch a Claude Code native background agent/task with the prompt from ${promptPath}; do not start Claude via Bash.`;
+      if (agent) {
+        return `Launch a Claude Code native background agent/task for this lane. If a matching native subagent/persona named "${agent}" is available, use it; otherwise use the default native agent. Give it the prompt from ${promptPath}; do not start Claude via Bash.`;
+      }
+      return `Launch a Claude Code native background agent/task with the prompt from ${promptPath}; do not start Claude via Bash.`;
     case "codex-cli":
-      return agent
-        ? `Open Codex CLI in the worktree. If a matching Codex agent/persona named "${agent}" is available, use it; otherwise provide the prompt from ${promptPath} to the default Codex CLI session.`
-        : `Open Codex CLI in the worktree and provide the prompt from ${promptPath}.`;
+      if (agent) {
+        return `Open Codex CLI in the worktree. If a matching Codex agent/persona named "${agent}" is available, use it; otherwise provide the prompt from ${promptPath} to the default Codex CLI session.`;
+      }
+      return `Open Codex CLI in the worktree and provide the prompt from ${promptPath}.`;
     case "pi-cli":
-      return agent
-        ? `Open Pi CLI in the worktree. If a matching Pi skill/persona named "${agent}" is available, use it; otherwise provide the prompt from ${promptPath} to the default Pi CLI session.`
-        : `Open Pi CLI in the worktree and provide the prompt from ${promptPath}.`;
+      if (agent) {
+        return `Open Pi CLI in the worktree. If a matching Pi skill/persona named "${agent}" is available, use it; otherwise provide the prompt from ${promptPath} to the default Pi CLI session.`;
+      }
+      return `Open Pi CLI in the worktree and provide the prompt from ${promptPath}.`;
     case "codex-native":
-      return agent
-        ? `Launch a Codex native background agent/task for this lane. If a matching native agent/persona named "${agent}" is available, use it; otherwise use the default native agent. Give it the prompt from ${promptPath}; do not start Codex via Bash.`
-        : `Launch a Codex native background agent/task with the prompt from ${promptPath}; do not start Codex via Bash.`;
+      if (agent) {
+        return `Launch a Codex native background agent/task for this lane. If a matching native agent/persona named "${agent}" is available, use it; otherwise use the default native agent. Give it the prompt from ${promptPath}; do not start Codex via Bash.`;
+      }
+      return `Launch a Codex native background agent/task with the prompt from ${promptPath}; do not start Codex via Bash.`;
     case "cursor-sdk":
       return "Use `swarm run <workspace>` for headless Cursor SDK execution.";
   }

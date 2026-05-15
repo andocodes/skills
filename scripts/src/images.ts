@@ -4,17 +4,21 @@ import { fileURLToPath } from "node:url";
 
 export const SWARM_IMAGE_VERSION = "0.1.0";
 
-export type ImagePreset =
-  | "codex-core"
-  | "claude-core"
-  | "pi-core"
-  | "codex-rust"
-  | "claude-rust"
-  | "pi-rust"
-  | "codex-go"
-  | "claude-go"
-  | "pi-go"
-  | "fake";
+export const imagePresetValues = [
+  "codex-core",
+  "claude-core",
+  "pi-core",
+  "codex-rust",
+  "claude-rust",
+  "pi-rust",
+  "codex-go",
+  "claude-go",
+  "pi-go",
+  "fake",
+] as const;
+export const imagePresetDescription = imagePresetValues.join(", ");
+
+export type ImagePreset = (typeof imagePresetValues)[number];
 
 export interface ImageBuildOptions {
   preset: ImagePreset;
@@ -70,23 +74,14 @@ export function defaultImageTag(preset: ImagePreset): string {
 }
 
 export function parseImagePreset(value: string): ImagePreset {
-  if (
-    value === "codex-core" ||
-    value === "claude-core" ||
-    value === "pi-core" ||
-    value === "codex-rust" ||
-    value === "claude-rust" ||
-    value === "pi-rust" ||
-    value === "codex-go" ||
-    value === "claude-go" ||
-    value === "pi-go" ||
-    value === "fake"
-  ) {
+  if (isImagePreset(value)) {
     return value;
   }
-  throw new Error(
-    `expected image preset codex-core, claude-core, pi-core, codex-rust, claude-rust, pi-rust, codex-go, claude-go, pi-go, or fake; got ${value}`
-  );
+  throw new Error(`expected image preset ${imagePresetDescription}; got ${value}`);
+}
+
+function isImagePreset(value: string): value is ImagePreset {
+  return (imagePresetValues as readonly string[]).includes(value);
 }
 
 function parsePreset(preset: ImagePreset): { harness: string; toolchain: string } {

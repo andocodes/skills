@@ -39,6 +39,33 @@ export interface RunLaunchPlanResult {
   error?: string;
 }
 
+type CliExecutor = Extract<Executor, "claude-cli" | "codex-cli" | "pi-cli">;
+type ProfileFiles = NonNullable<LaunchPlan["profileFiles"]>;
+
+interface CliLaunchAdapter {
+  defaultImage: string;
+  hostCommand: (worktreePath: string, readonly: boolean) => string[];
+  containerCommand: (readonly: boolean) => string;
+}
+
+const cliLaunchAdapters = {
+  "codex-cli": {
+    defaultImage: "swarm-agent:0.1.0-codex-core",
+    hostCommand: codexHostCommand,
+    containerCommand: codexContainerCommand,
+  },
+  "claude-cli": {
+    defaultImage: "swarm-agent:0.1.0-claude-core",
+    hostCommand: claudeHostCommand,
+    containerCommand: claudeContainerCommand,
+  },
+  "pi-cli": {
+    defaultImage: "swarm-agent:0.1.0-pi-core",
+    hostCommand: piHostCommand,
+    containerCommand: piContainerCommand,
+  },
+} satisfies Record<CliExecutor, CliLaunchAdapter>;
+
 export function buildLaunchPlan(args: BuildLaunchPlanArgs): LaunchPlan {
   if (args.executor === "cursor-sdk") {
     return {
@@ -50,7 +77,7 @@ export function buildLaunchPlan(args: BuildLaunchPlanArgs): LaunchPlan {
     };
   }
 
-  if (args.executor === "cursor-visible" || args.executor.endsWith("-native")) {
+  if (isNativeExecutor(args.executor)) {
     return {
       kind: "native",
       executor: args.executor,
@@ -90,7 +117,8 @@ export function runLaunchPlan(plan: LaunchPlan): RunLaunchPlanResult {
 
 function hostCliPlan(args: BuildLaunchPlanArgs): LaunchPlan {
   const profileFiles = resolveProfileFiles(args.taskState);
-  const command = hostCliCommand(args.executor, args.taskState.worktreePath, isReadonly(args.isolation));
+  const adapter = cliAdapter(args.executor);
+  const command = adapter.hostCommand(args.taskState.worktreePath, isReadonly(args.isolation));
   const env = swarmEnv(args, profileFiles);
   return {
     kind: "command",
@@ -108,9 +136,11 @@ function hostCliPlan(args: BuildLaunchPlanArgs): LaunchPlan {
 
 function containerCliPlan(args: BuildLaunchPlanArgs): LaunchPlan {
   const profileFiles = resolveProfileFiles(args.taskState);
+  const adapter = cliAdapter(args.executor);
   const runtime = args.isolation.runtime ?? "docker";
-  const image = args.isolation.image ?? defaultImageForExecutor(args.executor);
+  const image = args.isolation.image ?? adapter.defaultImage;
   const readonly = isReadonly(args.isolation);
+  const cliCommand = adapter.containerCommand(readonly);
   const command = [
     runtime,
     "run",
@@ -122,18 +152,162 @@ function containerCliPlan(args: BuildLaunchPlanArgs): LaunchPlan {
     args.taskState.worktreePath,
     ...networkArgs(args.isolation),
     ...userArgs(),
+    ...containerMountArgs(args, readonly, profileFiles),
+    ...containerProfileArgs(profileFiles),
+    ...containerEnvArgs(),
+    image,
+    "sh",
+    "-lc",
+    containerScript(cliCommand),
+  ];
+
+  return {
+    kind: "command",
+    executor: args.executor,
+    isolation: { ...args.isolation, runtime },
+    cwd: args.root,
+    command,
+    commandPreview: shellQuoteAll(command),
+    env: swarmEnv(args, profileFiles),
+    profileFiles,
+    instructions: `Run ${args.executor} inside ${runtime} image ${image}. The image must contain the selected agent CLI, git, and any profile resolver needed by SWARM_AUTH_PROFILE or SWARM_GIT_IDENTITY.`,
+  };
+}
+
+function cliAdapter(executor: Executor): CliLaunchAdapter {
+  if (isCliExecutor(executor)) return cliLaunchAdapters[executor];
+  throw new Error(`${executor} is not a CLI executor`);
+}
+
+function isCliExecutor(executor: Executor): executor is CliExecutor {
+  switch (executor) {
+    case "codex-cli":
+    case "claude-cli":
+    case "pi-cli":
+      return true;
+    default:
+      return false;
+  }
+}
+
+function isNativeExecutor(executor: Executor): boolean {
+  switch (executor) {
+    case "cursor-visible":
+    case "claude-native":
+    case "codex-native":
+      return true;
+    default:
+      return false;
+  }
+}
+
+function codexHostCommand(worktreePath: string, readonly: boolean): string[] {
+  if (readonly) {
+    return ["codex", "exec", "--cd", worktreePath, "--sandbox", "read-only", "-"];
+  }
+  return [
+    "codex",
+    "exec",
+    "--cd",
+    worktreePath,
+    "--dangerously-bypass-approvals-and-sandbox",
+    "-",
+  ];
+}
+
+function claudeHostCommand(_worktreePath: string, readonly: boolean): string[] {
+  if (readonly) {
+    return [
+      "claude",
+      "--print",
+      "--input-format",
+      "text",
+      "--permission-mode",
+      "plan",
+      "--disallowedTools",
+      "Edit,MultiEdit,Write,NotebookEdit",
+    ];
+  }
+  return ["claude", "--print", "--dangerously-skip-permissions", "--input-format", "text"];
+}
+
+function piHostCommand(_worktreePath: string, readonly: boolean): string[] {
+  if (readonly) {
+    return ["pi", "-p", "--no-session", "--tools", "read,grep,find,ls"];
+  }
+  return ["pi", "-p", "--no-session"];
+}
+
+function codexContainerCommand(readonly: boolean): string {
+  if (readonly) {
+    return 'codex exec --cd "$SWARM_WORKTREE" --sandbox read-only - < "$SWARM_PROMPT"';
+  }
+  return [
+    'codex exec --cd "$SWARM_WORKTREE"',
+    "--dangerously-bypass-approvals-and-sandbox",
+    '- < "$SWARM_PROMPT"',
+  ].join(" ");
+}
+
+function claudeContainerCommand(readonly: boolean): string {
+  if (readonly) {
+    return [
+      "claude --print --input-format text",
+      "--permission-mode plan",
+      "--disallowedTools Edit,MultiEdit,Write,NotebookEdit",
+      '< "$SWARM_PROMPT"',
+    ].join(" ");
+  }
+  return 'claude --print --dangerously-skip-permissions --input-format text < "$SWARM_PROMPT"';
+}
+
+function piContainerCommand(readonly: boolean): string {
+  if (readonly) {
+    return 'pi -p --no-session --tools read,grep,find,ls < "$SWARM_PROMPT"';
+  }
+  return 'pi -p --no-session < "$SWARM_PROMPT"';
+}
+
+function containerScript(cliCommand: string): string {
+  return [
+    "set -eu",
+    'mkdir -p "$(dirname "$SWARM_HANDOFF")" /tmp/swarm-home',
+    'cd "$SWARM_WORKTREE"',
+    'if [ -n "${SWARM_AUTH_PROFILE:-}" ]; then echo "[swarm] auth profile: $SWARM_AUTH_PROFILE" >&2; fi',
+    'if [ -n "${SWARM_GIT_IDENTITY_FILE:-}" ]; then export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=include.path GIT_CONFIG_VALUE_0="$SWARM_GIT_IDENTITY_FILE"; fi',
+    'if [ -n "${SWARM_GIT_IDENTITY:-}" ]; then echo "[swarm] git identity: $SWARM_GIT_IDENTITY" >&2; fi',
+    cliCommand,
+  ].join("\n");
+}
+
+function containerMountArgs(
+  args: BuildLaunchPlanArgs,
+  readonly: boolean,
+  profileFiles: ProfileFiles
+): string[] {
+  const mounts = [
     "--mount",
     bindMount(args.workspace),
     "--mount",
     bindMount(args.taskState.repoPath, readonly),
-    ...(readonly ? ["--mount", bindMount(args.taskState.worktreePath, true)] : []),
-    ...(profileFiles.gitConfig
-      ? [
-          "--mount",
-          `type=bind,source=${profileFiles.gitConfig},target=/run/swarm/git-identity.gitconfig,readonly`,
-        ]
-      : []),
-    ...(profileFiles.authEnv ? ["--env-file", profileFiles.authEnv] : []),
+  ];
+  if (readonly) mounts.push("--mount", bindMount(args.taskState.worktreePath, true));
+  if (profileFiles.gitConfig) {
+    mounts.push(
+      "--mount",
+      `type=bind,source=${profileFiles.gitConfig},target=/run/swarm/git-identity.gitconfig,readonly`
+    );
+  }
+  return mounts;
+}
+
+function containerProfileArgs(profileFiles: ProfileFiles): string[] {
+  if (!profileFiles.authEnv) return [];
+  return ["--env-file", profileFiles.authEnv];
+}
+
+function containerEnvArgs(): string[] {
+  return [
     "-e",
     "SWARM_TASK",
     "-e",
@@ -154,96 +328,7 @@ function containerCliPlan(args: BuildLaunchPlanArgs): LaunchPlan {
     "SWARM_GIT_IDENTITY_FILE",
     "-e",
     "HOME=/tmp/swarm-home",
-    image,
-    "sh",
-    "-lc",
-    containerScript(args.executor, readonly),
   ];
-
-  return {
-    kind: "command",
-    executor: args.executor,
-    isolation: { ...args.isolation, runtime },
-    cwd: args.root,
-    command,
-    commandPreview: shellQuoteAll(command),
-    env: swarmEnv(args, profileFiles),
-    profileFiles,
-    instructions: `Run ${args.executor} inside ${runtime} image ${image}. The image must contain the selected agent CLI, git, and any profile resolver needed by SWARM_AUTH_PROFILE or SWARM_GIT_IDENTITY.`,
-  };
-}
-
-function hostCliCommand(executor: Executor, worktreePath: string, readonly: boolean): string[] {
-  switch (executor) {
-    case "codex-cli":
-      return readonly
-        ? ["codex", "exec", "--cd", worktreePath, "--sandbox", "read-only", "-"]
-        : [
-            "codex",
-            "exec",
-            "--cd",
-            worktreePath,
-            "--dangerously-bypass-approvals-and-sandbox",
-            "-",
-          ];
-    case "claude-cli":
-      return readonly
-        ? [
-            "claude",
-            "--print",
-            "--input-format",
-            "text",
-            "--permission-mode",
-            "plan",
-            "--disallowedTools",
-            "Edit,MultiEdit,Write,NotebookEdit",
-          ]
-        : ["claude", "--print", "--dangerously-skip-permissions", "--input-format", "text"];
-    case "pi-cli":
-      return readonly
-        ? ["pi", "-p", "--no-session", "--tools", "read,grep,find,ls"]
-        : ["pi", "-p", "--no-session"];
-    default:
-      throw new Error(`${executor} is not a CLI executor`);
-  }
-}
-
-function containerScript(executor: Executor, readonly: boolean): string {
-  const command = containerCliCommand(executor, readonly);
-  return [
-    "set -eu",
-    'mkdir -p "$(dirname "$SWARM_HANDOFF")" /tmp/swarm-home',
-    'cd "$SWARM_WORKTREE"',
-    'if [ -n "${SWARM_AUTH_PROFILE:-}" ]; then echo "[swarm] auth profile: $SWARM_AUTH_PROFILE" >&2; fi',
-    'if [ -n "${SWARM_GIT_IDENTITY_FILE:-}" ]; then export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=include.path GIT_CONFIG_VALUE_0="$SWARM_GIT_IDENTITY_FILE"; fi',
-    'if [ -n "${SWARM_GIT_IDENTITY:-}" ]; then echo "[swarm] git identity: $SWARM_GIT_IDENTITY" >&2; fi',
-    command,
-  ].join("\n");
-}
-
-function containerCliCommand(executor: Executor, readonly: boolean): string {
-  switch (executor) {
-    case "codex-cli":
-      return readonly
-        ? 'codex exec --cd "$SWARM_WORKTREE" --sandbox read-only - < "$SWARM_PROMPT"'
-        : 'codex exec --cd "$SWARM_WORKTREE" --dangerously-bypass-approvals-and-sandbox - < "$SWARM_PROMPT"';
-    case "claude-cli":
-      return readonly
-        ? 'claude --print --input-format text --permission-mode plan --disallowedTools Edit,MultiEdit,Write,NotebookEdit < "$SWARM_PROMPT"'
-        : 'claude --print --dangerously-skip-permissions --input-format text < "$SWARM_PROMPT"';
-    case "pi-cli":
-      return readonly
-        ? 'pi -p --no-session --tools read,grep,find,ls < "$SWARM_PROMPT"'
-        : 'pi -p --no-session < "$SWARM_PROMPT"';
-    default:
-      throw new Error(`${executor} is not a CLI executor`);
-  }
-}
-
-function defaultImageForExecutor(executor: Executor): string {
-  if (executor === "claude-cli") return "swarm-agent:0.1.0-claude-core";
-  if (executor === "pi-cli") return "swarm-agent:0.1.0-pi-core";
-  return "swarm-agent:0.1.0-codex-core";
 }
 
 function networkArgs(isolation: Isolation): string[] {
@@ -259,7 +344,7 @@ function userArgs(): string[] {
 
 function swarmEnv(
   args: BuildLaunchPlanArgs,
-  profileFiles: { authEnv?: string; gitConfig?: string } = {}
+  profileFiles: ProfileFiles = {}
 ): Record<string, string> {
   const env: Record<string, string> = {
     SWARM_TASK: args.taskState.name,
@@ -305,7 +390,7 @@ function profileRoot(): string {
   return process.env.SWARM_PROFILE_HOME ?? join(homedir(), ".swarm", "profiles");
 }
 
-function resolveProfileFiles(taskState: TaskState): { authEnv?: string; gitConfig?: string } {
+function resolveProfileFiles(taskState: TaskState): ProfileFiles {
   const root = profileRoot();
   const files: { authEnv?: string; gitConfig?: string } = {};
   if (taskState.authProfile) {

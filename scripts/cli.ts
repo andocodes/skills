@@ -1,9 +1,21 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
 import { authDoctor } from "./src/auth.ts";
-import { buildImage, parseImagePreset } from "./src/images.ts";
+import { buildImage, imagePresetDescription, parseImagePreset } from "./src/images.ts";
 import { SwarmManager } from "./src/manager.ts";
-import { type Executor, type Isolation, SwarmValidationError } from "./src/schemas.ts";
+import {
+  executorDescription,
+  executorSchema,
+  type Executor,
+  type Isolation,
+  isolationModeDescription,
+  isolationModeSchema,
+  isolationNetworkDescription,
+  isolationNetworkSchema,
+  isolationRuntimeDescription,
+  isolationRuntimeSchema,
+  SwarmValidationError,
+} from "./src/schemas.ts";
 
 const program = new Command();
 
@@ -27,7 +39,7 @@ image
   .command("build")
   .argument(
     "[preset]",
-    "Image preset: codex-core, claude-core, pi-core, codex-rust, claude-rust, pi-rust, codex-go, claude-go, pi-go, or fake",
+    `Image preset: ${imagePresetDescription}`,
     "codex-core"
   )
   .option("--runtime <runtime>", "Container builder runtime: docker or podman", parseContainerRuntime, "docker")
@@ -52,7 +64,7 @@ program
   .option("--base-ref <ref>", "Base ref for task worktrees")
   .option(
     "--executor <executor>",
-    "Default executor: cursor-visible, cursor-sdk, claude-native, claude-cli, codex-native, codex-cli, or pi-cli",
+    `Default executor: ${executorDescription}`,
     "cursor-visible"
   )
   .option(
@@ -95,7 +107,7 @@ program
   .option("--model <model>", "Planner model id", "default")
   .option(
     "--executor <executor>",
-    "Default executor: cursor-visible, cursor-sdk, claude-native, claude-cli, codex-native, codex-cli, or pi-cli",
+    `Default executor: ${executorDescription}`,
     "cursor-sdk"
   )
   .option(
@@ -282,25 +294,15 @@ function parseRepoMode(value: string): "auto" | "single" | "siblings" {
 }
 
 function parseExecutor(value: string): Executor {
-  if (
-    value === "cursor-visible" ||
-    value === "cursor-sdk" ||
-    value === "claude-native" ||
-    value === "claude-cli" ||
-    value === "codex-native" ||
-    value === "codex-cli" ||
-    value === "pi-cli"
-  ) {
-    return value;
-  }
-  throw new Error(
-    `expected executor cursor-visible, cursor-sdk, claude-native, claude-cli, codex-native, codex-cli, or pi-cli; got ${value}`
-  );
+  const parsed = executorSchema.safeParse(value);
+  if (parsed.success) return parsed.data;
+  throw new Error(`expected executor ${executorDescription}; got ${value}`);
 }
 
 function parseContainerRuntime(value: string): "docker" | "podman" {
-  if (value === "docker" || value === "podman") return value;
-  throw new Error(`expected container runtime docker or podman; got ${value}`);
+  const parsed = isolationRuntimeSchema.safeParse(value);
+  if (parsed.success) return parsed.data;
+  throw new Error(`expected container runtime ${isolationRuntimeDescription}; got ${value}`);
 }
 
 function parseIsolation(options: {
@@ -310,39 +312,35 @@ function parseIsolation(options: {
   network?: string;
 }): Isolation {
   const mode = options.isolation ?? "worktree";
-  if (
-    mode !== "worktree" &&
-    mode !== "container" &&
-    mode !== "readonly"
-  ) {
-    throw new Error(`expected isolation worktree, container, or readonly; got ${mode}`);
+  const parsedMode = isolationModeSchema.safeParse(mode);
+  if (!parsedMode.success) {
+    throw new Error(`expected isolation ${isolationModeDescription}; got ${mode}`);
   }
 
   const network = options.network ?? "restricted";
-  if (network !== "restricted" && network !== "none" && network !== "inherit") {
-    throw new Error(`expected network restricted, none, or inherit; got ${network}`);
+  const parsedNetwork = isolationNetworkSchema.safeParse(network);
+  if (!parsedNetwork.success) {
+    throw new Error(`expected network ${isolationNetworkDescription}; got ${network}`);
   }
 
   const rawRuntime = options.isolationRuntime;
-  if (rawRuntime && rawRuntime !== "docker" && rawRuntime !== "podman") {
-    throw new Error(`expected isolation runtime docker or podman; got ${rawRuntime}`);
+  const parsedRuntime = rawRuntime ? isolationRuntimeSchema.safeParse(rawRuntime) : undefined;
+  if (parsedRuntime && !parsedRuntime.success) {
+    throw new Error(`expected isolation runtime ${isolationRuntimeDescription}; got ${rawRuntime}`);
   }
-  const runtime = rawRuntime as Isolation["runtime"] | undefined;
-  if (mode === "container" && runtime && runtime !== "docker" && runtime !== "podman") {
-    throw new Error(`container isolation supports docker or podman; got ${runtime}`);
+  const runtime = parsedRuntime?.data;
+  if ((parsedMode.data === "worktree" || parsedMode.data === "readonly") && runtime) {
+    throw new Error(`${parsedMode.data} isolation does not use a runtime`);
   }
-  if ((mode === "worktree" || mode === "readonly") && runtime) {
-    throw new Error(`${mode} isolation does not use a runtime`);
-  }
-  if ((mode === "worktree" || mode === "readonly") && options.isolationImage) {
-    throw new Error(`${mode} isolation does not use an image`);
+  if ((parsedMode.data === "worktree" || parsedMode.data === "readonly") && options.isolationImage) {
+    throw new Error(`${parsedMode.data} isolation does not use an image`);
   }
 
   return {
-    mode,
+    mode: parsedMode.data,
     runtime,
     image: options.isolationImage,
-    network,
+    network: parsedNetwork.data,
   };
 }
 

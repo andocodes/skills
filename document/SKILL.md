@@ -25,6 +25,7 @@ Write reader-ready project documentation. Keep it concise, verified, and useful:
    - Prefer README first. Treat the README as the front door: what it is, who it is for, quick start, core concepts, common workflows, and links.
    - Ask before creating or reorganizing a `docs/` folder.
    - When a `docs/` folder is approved or already established, use `docs/README.md` as the index and split stable deeper material into focused pages such as architecture, CLI reference, deployment, adapters, auth, operations, or contributing.
+   - Include repository layout, architecture maps, file trees, and docs indexes only when the user asks for them or they explain a non-obvious navigation path, ownership boundary, generated area, or extension point.
    - Avoid scaffolding extra pages for small projects.
 
 4. Write minimum sufficient docs.

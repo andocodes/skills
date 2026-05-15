@@ -1,0 +1,4 @@
+interface:
+  display_name: "Clarify"
+  short_description: "Refine code for clarity without behavior changes"
+  default_prompt: "Use $clarify to simplify and clarify the recent code changes without changing behavior."

@@ -1,5 +1,5 @@
-scripts/node_modules/
-.swarm/
-logs/
+**/node_modules/
+**/.swarm/
+**/logs/
 *.log
 .DS_Store

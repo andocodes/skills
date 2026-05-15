@@ -10,11 +10,11 @@
 
 ## Install
 
-Clone this repository anywhere you keep local tools, then run the installer.
+Clone this repository into a harness-neutral location, then run the installer.
 
 ```bash
-git clone git@github.com:andocodes/skills.git <your-tools-folder>/skills
-cd <your-tools-folder>/skills
+git clone git@github.com:andocodes/skills.git ~/.skills
+cd ~/.skills
 ./install.sh
 ```
 
@@ -24,14 +24,14 @@ Default install locations:
 - Claude Code: `~/.claude/skills/swarm`
 - Codex CLI: `~/.codex/skills/swarm`
 
-The install script creates symlinks to the repository root, so edits in the clone update all hosts.
+The install script creates symlinks to each skill folder, so edits in `~/.skills/<skill>` update all hosts.
 
 ## Runtime Setup
 
 Install the TypeScript CLI dependencies once:
 
 ```bash
-cd scripts
+cd swarm/scripts
 bun install
 bun run check
 ```

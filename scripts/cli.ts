@@ -1,14 +1,15 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
 import { authDoctor } from "./src/auth.ts";
+import { buildImage, parseImagePreset } from "./src/images.ts";
 import { SwarmManager } from "./src/manager.ts";
-import { type Executor, SwarmValidationError } from "./src/schemas.ts";
+import { type Executor, type Isolation, SwarmValidationError } from "./src/schemas.ts";
 
 const program = new Command();
 
 program
   .name("swarm")
-  .description("Run local worktree orchestration for the /swarm skill.")
+  .description("Run local orchestration for the swarm skill.")
   .version("0.0.0");
 
 program
@@ -20,12 +21,46 @@ program
     process.exitCode = result.ok ? 0 : 1;
   });
 
+const image = program.command("image").description("Build swarm agent container images");
+
+image
+  .command("build")
+  .argument("[preset]", "Image preset: codex-core, claude-core, codex-rust, claude-rust, codex-go, claude-go, or fake", "codex-core")
+  .option("--runtime <runtime>", "Container builder runtime: docker or podman", parseContainerRuntime, "docker")
+  .option("--tag <tag>", "Override image tag")
+  .option("--dry-run", "Print build command without running it")
+  .description("Build a swarm-agent image")
+  .action((preset, options) => {
+    const result = buildImage({
+      preset: parseImagePreset(preset),
+      runtime: options.runtime,
+      tag: options.tag,
+      dryRun: Boolean(options.dryRun),
+    });
+    console.log(JSON.stringify(result, null, 2));
+    if (result.status !== undefined) process.exitCode = result.status;
+  });
+
 program
   .command("init")
-  .argument("<goal>", "Goal for the visible local swarm")
+  .argument("<goal>", "Goal for the local swarm")
   .option("--root-slug <slug>", "Workspace slug under .swarm/")
   .option("--base-ref <ref>", "Base ref for task worktrees")
-  .option("--executor <executor>", "Default executor: cursor-visible, cursor-sdk, claude-cli, or codex-cli", "cursor-visible")
+  .option(
+    "--executor <executor>",
+    "Default executor: cursor-visible, cursor-sdk, claude-native, claude-cli, codex-native, or codex-cli",
+    "cursor-visible"
+  )
+  .option(
+    "--isolation <mode>",
+    "Default isolation: worktree, container, or readonly",
+    "worktree"
+  )
+  .option("--isolation-runtime <runtime>", "Isolation runtime: docker or podman")
+  .option("--isolation-image <image>", "Container image for container isolation")
+  .option("--network <policy>", "Isolation network policy: restricted, none, or inherit")
+  .option("--auth-profile <profile>", "Named local auth profile; never an inline secret")
+  .option("--git-identity <identity>", "Named local git identity profile")
   .option("--repo <path>", "Repository root or child path")
   .option(
     "--repo-mode <mode>",
@@ -39,6 +74,9 @@ program
       rootSlug: options.rootSlug,
       baseRef: options.baseRef,
       executor: parseExecutor(options.executor),
+      isolation: parseIsolation(options),
+      authProfile: options.authProfile,
+      gitIdentity: options.gitIdentity,
       repo: options.repo,
       repoMode: parseRepoMode(options.repoMode),
     });
@@ -51,7 +89,21 @@ program
   .option("--root-slug <slug>", "Workspace slug under .swarm/")
   .option("--base-ref <ref>", "Base ref for task worktrees")
   .option("--model <model>", "Planner model id", "default")
-  .option("--executor <executor>", "Default executor: cursor-visible, cursor-sdk, claude-cli, or codex-cli", "cursor-sdk")
+  .option(
+    "--executor <executor>",
+    "Default executor: cursor-visible, cursor-sdk, claude-native, claude-cli, codex-native, or codex-cli",
+    "cursor-sdk"
+  )
+  .option(
+    "--isolation <mode>",
+    "Default isolation: worktree, container, or readonly",
+    "worktree"
+  )
+  .option("--isolation-runtime <runtime>", "Isolation runtime: docker or podman")
+  .option("--isolation-image <image>", "Container image for container isolation")
+  .option("--network <policy>", "Isolation network policy: restricted, none, or inherit")
+  .option("--auth-profile <profile>", "Named local auth profile; never an inline secret")
+  .option("--git-identity <identity>", "Named local git identity profile")
   .option("--repo <path>", "Repository root or child path")
   .option(
     "--repo-mode <mode>",
@@ -65,6 +117,9 @@ program
       baseRef: options.baseRef,
       model: options.model,
       executor: parseExecutor(options.executor),
+      isolation: parseIsolation(options),
+      authProfile: options.authProfile,
+      gitIdentity: options.gitIdentity,
       repo: options.repo,
       repoMode: parseRepoMode(options.repoMode),
     });
@@ -102,6 +157,22 @@ program
   .description("Prepare a task worktree and prompt for the selected executor")
   .action((workspace, task) => {
     console.log(JSON.stringify(SwarmManager.load(workspace).prepareVisibleTask(task), null, 2));
+  });
+
+program
+  .command("launch")
+  .argument("<workspace>", "Swarm workspace path")
+  .argument("<task>", "Pending or running task name")
+  .option("--dry-run", "Print the launch plan without executing it")
+  .option("--no-complete", "Do not record the handoff after the command exits")
+  .description("Prepare and execute a command-backed CLI lane")
+  .action((workspace, task, options) => {
+    const result = SwarmManager.load(workspace).launchTask(task, {
+      dryRun: Boolean(options.dryRun),
+      complete: options.complete,
+    });
+    console.log(JSON.stringify(result, null, 2));
+    if (result.run) process.exitCode = result.run.status;
   });
 
 program
@@ -210,12 +281,64 @@ function parseExecutor(value: string): Executor {
   if (
     value === "cursor-visible" ||
     value === "cursor-sdk" ||
+    value === "claude-native" ||
     value === "claude-cli" ||
+    value === "codex-native" ||
     value === "codex-cli"
   ) {
     return value;
   }
-  throw new Error(`expected executor cursor-visible, cursor-sdk, claude-cli, or codex-cli; got ${value}`);
+  throw new Error(
+    `expected executor cursor-visible, cursor-sdk, claude-native, claude-cli, codex-native, or codex-cli; got ${value}`
+  );
+}
+
+function parseContainerRuntime(value: string): "docker" | "podman" {
+  if (value === "docker" || value === "podman") return value;
+  throw new Error(`expected container runtime docker or podman; got ${value}`);
+}
+
+function parseIsolation(options: {
+  isolation?: string;
+  isolationRuntime?: string;
+  isolationImage?: string;
+  network?: string;
+}): Isolation {
+  const mode = options.isolation ?? "worktree";
+  if (
+    mode !== "worktree" &&
+    mode !== "container" &&
+    mode !== "readonly"
+  ) {
+    throw new Error(`expected isolation worktree, container, or readonly; got ${mode}`);
+  }
+
+  const network = options.network ?? "restricted";
+  if (network !== "restricted" && network !== "none" && network !== "inherit") {
+    throw new Error(`expected network restricted, none, or inherit; got ${network}`);
+  }
+
+  const rawRuntime = options.isolationRuntime;
+  if (rawRuntime && rawRuntime !== "docker" && rawRuntime !== "podman") {
+    throw new Error(`expected isolation runtime docker or podman; got ${rawRuntime}`);
+  }
+  const runtime = rawRuntime as Isolation["runtime"] | undefined;
+  if (mode === "container" && runtime && runtime !== "docker" && runtime !== "podman") {
+    throw new Error(`container isolation supports docker or podman; got ${runtime}`);
+  }
+  if ((mode === "worktree" || mode === "readonly") && runtime) {
+    throw new Error(`${mode} isolation does not use a runtime`);
+  }
+  if ((mode === "worktree" || mode === "readonly") && options.isolationImage) {
+    throw new Error(`${mode} isolation does not use an image`);
+  }
+
+  return {
+    mode,
+    runtime,
+    image: options.isolationImage,
+    network,
+  };
 }
 
 function parseAudience(value: string): "planner" | "task" | "all" {

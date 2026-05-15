@@ -74,4 +74,54 @@ describe("plan schema", () => {
     expect(plan.tasks[0].type).toBe("verifier");
     expect(plan.tasks[0].verifies).toBeUndefined();
   });
+
+  test("accepts isolation and local identity profiles", () => {
+    const plan = parsePlanJson(
+      JSON.stringify({
+        goal: "risky migration",
+        rootSlug: "risky-migration",
+        isolation: { mode: "container", runtime: "docker", image: "swarm-node-22" },
+        authProfile: "github-work",
+        gitIdentity: "thomas-work",
+        tasks: [
+          {
+            name: "port-module",
+            scopedGoal: "Port the module",
+            isolation: { mode: "container", runtime: "podman", network: "none" },
+            authProfile: "github-oss",
+            gitIdentity: "thomas-oss",
+          },
+        ],
+      })
+    );
+
+    expect(plan.isolation.mode).toBe("container");
+    expect(plan.isolation.runtime).toBe("docker");
+    expect(plan.tasks[0].isolation?.runtime).toBe("podman");
+    expect(plan.tasks[0].authProfile).toBe("github-oss");
+  });
+
+  test("rejects unknown isolation modes", () => {
+    expect(() =>
+      parsePlanJson(
+        JSON.stringify({
+          goal: "bad isolation",
+          rootSlug: "bad-isolation",
+          isolation: { mode: "vm", runtime: "docker" },
+        })
+      )
+    ).toThrow(SwarmValidationError);
+  });
+
+  test("rejects images outside container isolation", () => {
+    expect(() =>
+      parsePlanJson(
+        JSON.stringify({
+          goal: "bad image",
+          rootSlug: "bad-image",
+          isolation: { mode: "readonly", image: "swarm-agent:0.1.0-codex-core" },
+        })
+      )
+    ).toThrow(SwarmValidationError);
+  });
 });

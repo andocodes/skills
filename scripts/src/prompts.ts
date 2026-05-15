@@ -2,7 +2,7 @@ import type { LoadedAgent } from "./agents.ts";
 import { readHandoff } from "./handoff.ts";
 import { formatInbox, messagesForTask, type InboxMessage } from "./inbox.ts";
 import type { DiscoveredRepo } from "./repos.ts";
-import type { Executor, Plan, PlanTask, TaskState } from "./schemas.ts";
+import type { Executor, Isolation, Plan, PlanTask, TaskState } from "./schemas.ts";
 
 export function rootPlannerPrompt(args: {
   goal: string;
@@ -13,9 +13,12 @@ export function rootPlannerPrompt(args: {
   repositories: DiscoveredRepo[];
   repositoryMode: "single" | "siblings";
   executor: Executor;
+  isolation?: Isolation;
+  authProfile?: string;
+  gitIdentity?: string;
   defaultRepo?: string;
 }): string {
-  return `You are the root planner for a local /swarm run.
+  return `You are the root planner for a local swarm run.
 
 Goal:
 ${args.goal}
@@ -29,12 +32,17 @@ Plan contract:
 - rootSlug: "${args.rootSlug}".
 - repositoryMode: "${args.repositoryMode}".
 - executor: "${args.executor}" unless a specific task needs a different executor.
+- isolation: ${JSON.stringify(args.isolation ?? { mode: "worktree", network: "restricted" })} unless a task needs a stronger or weaker boundary.
+- authProfile: ${args.authProfile ? `"${args.authProfile}"` : "omit unless the user named a local auth profile"}.
+- gitIdentity: ${args.gitIdentity ? `"${args.gitIdentity}"` : "omit unless the user named a local git identity"}.
 - repositories: copy the available repositories below exactly.
 - defaultRepo: ${args.defaultRepo ? `"${args.defaultRepo}"` : "omit when multiple repos are available"}.
 - baseRef: "${args.baseRef}" unless you have a strong reason to use another existing ref.
 - maxConcurrency: 1-4, default 2.
 - tasks: worker and verifier tasks with kebab-case names.
-- A task may set executor to cursor-visible, cursor-sdk, claude-cli, or codex-cli.
+- A task may set executor to cursor-visible, cursor-sdk, claude-native, claude-cli, codex-native, or codex-cli.
+- A task may set isolation to { "mode": "worktree" }, { "mode": "container", "runtime": "docker" }, { "mode": "container", "runtime": "podman" }, or { "mode": "readonly" }. Container tasks may set readonly: true to mount the checkout read-only while still allowing handoff writes.
+- A task may set authProfile or gitIdentity only as named local profiles. Never inline tokens, private keys, or secret values.
 - In sibling repo mode, set task.repo for every task. Paths are relative to that repo.
 - Each task needs scopedGoal. Use agent when one of the available agents clearly fits.
 - Use dependsOn for ordering. Verifiers may set verifies when checking a specific worker, or omit verifies for standalone audit/check lanes.
@@ -80,7 +88,7 @@ function workerPrompt(args: {
   upstream: string;
   inbox: string;
 }): string {
-  return `You are a local /swarm worker.
+  return `You are a local swarm worker.
 
 Root goal:
 ${args.plan.goal}
@@ -97,6 +105,12 @@ ${args.taskState.branch}
 
 Repository:
 ${args.taskState.repo ?? "(default)"} at ${args.taskState.repoPath}
+
+Isolation:
+${renderIsolation(args.taskState)}
+
+Auth and git identity:
+${renderIdentity(args.taskState)}
 
 Allowed paths:
 ${renderList(args.task.pathsAllowed, "(none declared - stay tightly scoped and ask via handoff if blocked)")}
@@ -115,7 +129,9 @@ ${args.upstream}
 ${args.inbox}
 
 Rules:
-- You are running in an isolated git worktree for this task.
+- You are running inside the declared swarm isolation boundary for this task.
+- The git branch above is the durable boundary for any changes, even when the execution sandbox is a container.
+- Use only the named auth/git identity profiles above; never use ambient credentials if a profile is specified.
 - Do not merge, rebase, push, or open a PR.
 - Keep changes scoped to this task.
 - If you need to leave a parent-mediated note, mention the exact \`swarm note\` command in your handoff. Do not attempt sibling-to-sibling chat.
@@ -153,7 +169,7 @@ function verifierPrompt(args: {
   inbox: string;
 }): string {
   const target = args.plan.tasks.find(task => task.name === args.task.verifies);
-  return `You are a local /swarm verifier.
+  return `You are a local swarm verifier.
 
 Root goal:
 ${args.plan.goal}
@@ -173,6 +189,12 @@ ${args.taskState.branch}
 Repository:
 ${args.taskState.repo ?? "(default)"} at ${args.taskState.repoPath}
 
+Isolation:
+${renderIsolation(args.taskState)}
+
+Auth and git identity:
+${renderIdentity(args.taskState)}
+
 Acceptance to verify:
 ${renderChecklist(target?.acceptance ?? args.task.acceptance)}
 
@@ -184,7 +206,9 @@ ${args.upstream}
 ${args.inbox}
 
 Rules:
-- You are running in an isolated git worktree.
+- You are running inside the declared swarm isolation boundary for this task.
+- The git branch above is the durable boundary for any changes, even when the execution sandbox is a container.
+- Use only the named auth/git identity profiles above; never use ambient credentials if a profile is specified.
 - Do not modify code unless the verifier task explicitly asks you to. Report findings.
 - If you need to leave a parent-mediated note, mention the exact \`swarm note\` command in your handoff. Do not attempt sibling-to-sibling chat.
 - End your final answer with the exact structured handoff below.
@@ -244,7 +268,11 @@ function renderAvailableAgents(agents: Map<string, LoadedAgent>): string {
 function renderRepositories(repositories: DiscoveredRepo[]): string {
   if (repositories.length === 0) return "- (none discovered)";
   return repositories
-    .map(repo => `- ${repo.name}: path=${repo.path}, baseRef=${repo.baseRef}`)
+    .map(repo => {
+      const auth = repo.authProfile ? `, authProfile=${repo.authProfile}` : "";
+      const identity = repo.gitIdentity ? `, gitIdentity=${repo.gitIdentity}` : "";
+      return `- ${repo.name}: path=${repo.path}, baseRef=${repo.baseRef}${auth}${identity}`;
+    })
     .join("\n");
 }
 
@@ -254,4 +282,21 @@ function renderList(items: string[], empty: string): string {
 
 function renderChecklist(items: string[]): string {
   return items.length > 0 ? items.map(item => `- [ ] ${item}`).join("\n") : "- (none declared)";
+}
+
+function renderIsolation(taskState: TaskState): string {
+  const isolation = taskState.isolation;
+  const runtime = isolation.runtime ? ` runtime=${isolation.runtime}` : "";
+  const image = isolation.image ? ` image=${isolation.image}` : "";
+  const readonly = isolation.readonly ? " readonly=true" : "";
+  const notes = isolation.notes ? `\n- notes: ${isolation.notes}` : "";
+  return `- mode=${isolation.mode}${runtime}${image} network=${isolation.network}${readonly}${notes}`;
+}
+
+function renderIdentity(taskState: TaskState): string {
+  const lines = [
+    `- authProfile: ${taskState.authProfile ?? "(ambient/default)"}`,
+    `- gitIdentity: ${taskState.gitIdentity ?? "(ambient/default)"}`,
+  ];
+  return lines.join("\n");
 }

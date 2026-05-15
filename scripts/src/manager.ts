@@ -26,6 +26,12 @@ import {
   type InboxPriority,
 } from "./inbox.ts";
 import { writeJsonAtomic } from "./json.ts";
+import {
+  buildLaunchPlan,
+  runLaunchPlan,
+  type LaunchPlan,
+  type RunLaunchPlanResult,
+} from "./launch.ts";
 import { ensureWorkspaceDirs, projectRootFromWorkspace, workspacePath, slugify } from "./paths.ts";
 import { rootPlannerPrompt, taskPrompt } from "./prompts.ts";
 import {
@@ -40,6 +46,7 @@ import {
   type State,
   type TaskState,
   type Executor,
+  type Isolation,
   parsePlanJson,
   parseStateJson,
   SwarmValidationError,
@@ -53,6 +60,9 @@ export interface KickoffOptions {
   repo?: string;
   repoMode?: RepoMode;
   executor?: Executor;
+  isolation?: Isolation;
+  authProfile?: string;
+  gitIdentity?: string;
 }
 
 export interface RunLoopOptions {
@@ -66,7 +76,11 @@ export interface RunLoopOptions {
 export interface VisibleTaskLaunch {
   task: string;
   executor: Executor;
+  isolation: Isolation;
+  authProfile?: string;
+  gitIdentity?: string;
   requestedAgent?: string;
+  nativeAgentCandidates?: string[];
   cursorSubagentCandidates?: string[];
   branch: string;
   worktreePath: string;
@@ -76,6 +90,19 @@ export interface VisibleTaskLaunch {
   promptPath: string;
   handoffPath: string;
   launch: string;
+  launchPlan: LaunchPlan;
+}
+
+export interface LaunchTaskOptions {
+  dryRun?: boolean;
+  complete?: boolean;
+}
+
+export interface LaunchTaskResult {
+  launch: VisibleTaskLaunch;
+  dryRun?: boolean;
+  run?: RunLaunchPlanResult;
+  completed?: string;
 }
 
 export class SwarmManager {
@@ -147,6 +174,9 @@ export class SwarmManager {
       repositoryMode: repoContext.mode,
       repositories: repoContext.repos,
       executor: options.executor ?? "cursor-visible",
+      isolation: options.isolation,
+      authProfile: options.authProfile,
+      gitIdentity: options.gitIdentity,
       startedAt: now(),
     });
     console.error(`[swarm] workspace: ${workspace}`);
@@ -160,6 +190,9 @@ export class SwarmManager {
       repositories: repoContext.repos,
       repositoryMode: repoContext.mode === "siblings" ? "siblings" : "single",
       executor: options.executor ?? "cursor-sdk",
+      isolation: options.isolation,
+      authProfile: options.authProfile,
+      gitIdentity: options.gitIdentity,
       defaultRepo: repoContext.defaultRepo,
     });
     writePromptDiagnostics(workspace, "planner", prompt, agents, {
@@ -250,6 +283,9 @@ export class SwarmManager {
       defaultRepo: discovered.defaultRepo,
       baseRef: options.baseRef ?? discovered.repos[0]?.baseRef ?? "main",
       executor: options.executor ?? "cursor-visible",
+      isolation: options.isolation,
+      authProfile: options.authProfile,
+      gitIdentity: options.gitIdentity,
       initializedAt: now(),
     });
     return workspace;
@@ -343,7 +379,9 @@ export class SwarmManager {
         const deps = def?.dependsOn?.length ? ` deps=[${def.dependsOn.join(",")}]` : "";
         const agent = task.agent ? ` agent=${task.agent}` : "";
         const repo = task.repo ? ` repo=${task.repo}` : "";
-        return `${task.status.padEnd(10)} ${task.name}${repo}${agent}${deps} branch=${task.branch} worktree=${relative(this.root, task.worktreePath)}`;
+        const runtime = effectiveIsolationRuntime(task.isolation);
+        const isolation = ` isolation=${task.isolation.mode}${runtime ? `:${runtime}` : ""}`;
+        return `${task.status.padEnd(10)} ${task.name}${repo}${agent}${isolation}${deps} branch=${task.branch} worktree=${relative(this.root, task.worktreePath)}`;
       })
       .join("\n");
   }
@@ -413,6 +451,7 @@ export class SwarmManager {
     })}
 
 ${executorInstructions(taskState.executor ?? this.plan.executor)}
+${isolationLaunchInstructions(taskState.isolation)}
 - Work only in the task worktree: \`${taskState.worktreePath}\`.
 - Before your final response, write the same structured handoff to \`${finalHandoffPath}\`.
 - The parent will record that handoff with \`swarm complete ${this.workspace} ${task.name}\`.`;
@@ -421,15 +460,35 @@ ${executorInstructions(taskState.executor ?? this.plan.executor)}
     const diagnostics = writePromptDiagnostics(this.workspace, task.name, prompt, agents, {
       phase: "visible-task",
       repo: taskState.repo,
+      isolationMode: taskState.isolation.mode,
+      isolationRuntime: effectiveIsolationRuntime(taskState.isolation),
+      authProfile: taskState.authProfile,
+      gitIdentity: taskState.gitIdentity,
       model: task.model ?? "default",
       agent: task.agent,
     });
     this.promptDiagnostics.set(task.name, diagnostics);
     this.saveState();
+    const executor = taskState.executor ?? this.plan.executor;
+    const launch = launchInstruction(executor, promptPath, task.agent);
+    const launchPlan = buildLaunchPlan({
+      executor,
+      isolation: taskState.isolation,
+      taskState,
+      workspace: this.workspace,
+      root: this.root,
+      promptPath,
+      handoffPath: finalHandoffPath,
+      launchInstruction: launch,
+    });
     return {
       task: task.name,
-      executor: taskState.executor ?? this.plan.executor,
+      executor,
+      isolation: taskState.isolation,
+      authProfile: taskState.authProfile,
+      gitIdentity: taskState.gitIdentity,
       requestedAgent: task.agent,
+      nativeAgentCandidates: nativeAgentCandidates(task.agent),
       cursorSubagentCandidates:
         (taskState.executor ?? this.plan.executor) === "cursor-visible"
           ? cursorSubagentCandidates(task.agent)
@@ -441,7 +500,36 @@ ${executorInstructions(taskState.executor ?? this.plan.executor)}
       agent: task.agent,
       promptPath,
       handoffPath: finalHandoffPath,
-      launch: launchInstruction(taskState.executor ?? this.plan.executor, promptPath, task.agent),
+      launch,
+      launchPlan,
+    };
+  }
+
+  launchTask(taskName: string, options: LaunchTaskOptions = {}): LaunchTaskResult {
+    const launch = this.prepareVisibleTask(taskName);
+    if (options.dryRun) {
+      return { launch, dryRun: true };
+    }
+    if (launch.launchPlan.kind !== "command") {
+      throw new SwarmValidationError(
+        `${taskName}: ${launch.launchPlan.kind} launch plans must be started by the parent harness`
+      );
+    }
+
+    const run = runLaunchPlan(launch.launchPlan);
+    if (options.complete === false) return { launch, run };
+
+    if (existsSync(launch.handoffPath)) {
+      return { launch, run, completed: this.completeVisibleTask(taskName) };
+    }
+
+    return {
+      launch,
+      run,
+      completed: this.failVisibleTask(
+        taskName,
+        `launch exited with status ${run.status}${run.error ? ` (${run.error})` : ""} without writing ${launch.handoffPath}`
+      ),
     };
   }
 
@@ -470,6 +558,28 @@ ${executorInstructions(taskState.executor ?? this.plan.executor)}
     }
     this.saveState();
     return `${task.name}: ${taskState.status}`;
+  }
+
+  private failVisibleTask(taskName: string, reason: string): string {
+    const task = this.plan.tasks.find(t => t.name === taskName);
+    if (!task) throw new SwarmValidationError(`unknown task ${taskName}`);
+    const taskState = this.getTaskState(taskName);
+    const body = failureHandoff({
+      taskName: task.name,
+      branch: taskState.branch,
+      reason,
+      diagnostics: this.failureDiagnostics(task.name, new Error(reason)),
+    });
+    taskState.handoffPath = relative(
+      this.workspace,
+      writeHandoff({ workspace: this.workspace, task, body })
+    );
+    taskState.resultStatus = "error";
+    taskState.status = "error";
+    taskState.finishedAt = now();
+    this.attention(`${task.name}: ${reason}`);
+    this.saveState();
+    return `${task.name}: error`;
   }
 
   private spawnReadyTasks(taskTimeoutMs?: number): Array<{ name: string; promise: Promise<void> }> {
@@ -516,6 +626,10 @@ ${executorInstructions(taskState.executor ?? this.plan.executor)}
     const diagnostics = writePromptDiagnostics(this.workspace, task.name, prompt, agents, {
       phase: "task",
       repo: taskState.repo,
+      isolationMode: taskState.isolation.mode,
+      isolationRuntime: effectiveIsolationRuntime(taskState.isolation),
+      authProfile: taskState.authProfile,
+      gitIdentity: taskState.gitIdentity,
       model: task.model ?? "default",
       agent: task.agent,
     });
@@ -813,6 +927,9 @@ function initialTaskState(plan: Plan, workspace: string, task: PlanTask): TaskSt
     repoPath: repo.path,
     agent: task.agent,
     executor: task.executor ?? plan.executor,
+    isolation: resolvedIsolation(task.isolation ?? plan.isolation),
+    authProfile: task.authProfile ?? repo.authProfile ?? plan.authProfile,
+    gitIdentity: task.gitIdentity ?? repo.gitIdentity ?? plan.gitIdentity,
     branch: branchForTask(plan.rootSlug, task.name),
     worktreePath: worktreePathForTask(workspace, repo.name, task.name),
     agentId: null,
@@ -836,14 +953,30 @@ function withRepositoryDefaults(
     ...plan,
     repositoryMode,
     executor: plan.executor ?? "cursor-visible",
+    isolation: resolvedIsolation(plan.isolation),
     repositories,
     defaultRepo: plan.defaultRepo ?? defaultRepo,
     baseRef: plan.baseRef ?? repositories[0]?.baseRef ?? "main",
     tasks: plan.tasks.map(task => ({
       ...task,
       repo: task.repo ?? (repositories.length === 1 ? repositories[0].name : undefined),
+      isolation: task.isolation ? resolvedIsolation(task.isolation) : undefined,
     })),
   };
+}
+
+function resolvedIsolation(isolation: Isolation): Isolation {
+  if (isolation.mode === "container") {
+    return { ...isolation, runtime: isolation.runtime ?? "docker" };
+  }
+  const { runtime: _runtime, ...rest } = isolation;
+  return rest;
+}
+
+function effectiveIsolationRuntime(isolation: Isolation): string | undefined {
+  if (isolation.runtime) return isolation.runtime;
+  if (isolation.mode === "container") return "docker";
+  return undefined;
 }
 
 function countStatuses(tasks: TaskState[]): Record<string, number> {
@@ -882,14 +1015,28 @@ function executorInstructions(executor: Executor): string {
     case "claude-cli":
       return [
         "Executor: claude-cli",
-        "- You are running from Claude Code CLI in a terminal-visible task lane.",
+        "- You are running from a Claude Code CLI process started by another host.",
         "- Stream useful progress in the terminal and keep durable conclusions in the handoff.",
+      ].join("\n");
+    case "claude-native":
+      return [
+        "Executor: claude-native",
+        "- You are a Claude Code native background agent/task launched by the parent Claude session.",
+        "- Do not start another Claude process from Bash for this lane.",
+        "- The selected persona is embedded in this prompt. Use a matching native Claude subagent/persona when available; otherwise use the default native agent.",
       ].join("\n");
     case "codex-cli":
       return [
         "Executor: codex-cli",
-        "- You are running from Codex CLI in a terminal-visible task lane.",
+        "- You are running from a Codex CLI process started by another host.",
         "- Stream useful progress in the terminal and keep durable conclusions in the handoff.",
+      ].join("\n");
+    case "codex-native":
+      return [
+        "Executor: codex-native",
+        "- You are a Codex native background agent/task launched by the parent Codex session.",
+        "- Do not start another Codex process from Bash for this lane.",
+        "- The selected persona is embedded in this prompt. Use a matching native Codex agent/persona when available; otherwise use the default native agent.",
       ].join("\n");
     case "cursor-sdk":
       return [
@@ -900,8 +1047,34 @@ function executorInstructions(executor: Executor): string {
   }
 }
 
+function isolationLaunchInstructions(isolation: Isolation): string {
+  const runtime = effectiveIsolationRuntime(isolation);
+  switch (isolation.mode) {
+    case "worktree":
+      return [
+        "Isolation: worktree",
+        "- The task worktree is the execution boundary. Do not read or write outside the allowed task scope.",
+      ].join("\n");
+    case "readonly":
+      return [
+        "Isolation: readonly",
+        "- Treat the checkout as read-only. Do not modify files unless the parent explicitly changes this task's isolation mode.",
+      ].join("\n");
+    case "container":
+      return [
+        `Isolation: container (${runtime ?? "docker"})`,
+        "- Run inside the declared container sandbox when the selected harness supports it.",
+        "- Mount or clone only the task worktree, use the declared network policy, and keep credentials limited to named profiles.",
+      ].join("\n");
+  }
+}
+
 function cursorSubagentCandidates(agent: string | undefined): string[] {
   return agent ? [agent, "generalPurpose"] : ["generalPurpose"];
+}
+
+function nativeAgentCandidates(agent: string | undefined): string[] {
+  return agent ? [agent, "default"] : ["default"];
 }
 
 function launchInstruction(executor: Executor, promptPath: string, agent: string | undefined): string {
@@ -914,10 +1087,18 @@ function launchInstruction(executor: Executor, promptPath: string, agent: string
       return agent
         ? `Open Claude Code CLI in the worktree. If a matching Claude subagent/persona named "${agent}" is available, use it; otherwise provide the prompt from ${promptPath} to the default Claude CLI session.`
         : `Open Claude Code CLI in the worktree and provide the prompt from ${promptPath}.`;
+    case "claude-native":
+      return agent
+        ? `Launch a Claude Code native background agent/task for this lane. If a matching native subagent/persona named "${agent}" is available, use it; otherwise use the default native agent. Give it the prompt from ${promptPath}; do not start Claude via Bash.`
+        : `Launch a Claude Code native background agent/task with the prompt from ${promptPath}; do not start Claude via Bash.`;
     case "codex-cli":
       return agent
         ? `Open Codex CLI in the worktree. If a matching Codex agent/persona named "${agent}" is available, use it; otherwise provide the prompt from ${promptPath} to the default Codex CLI session.`
         : `Open Codex CLI in the worktree and provide the prompt from ${promptPath}.`;
+    case "codex-native":
+      return agent
+        ? `Launch a Codex native background agent/task for this lane. If a matching native agent/persona named "${agent}" is available, use it; otherwise use the default native agent. Give it the prompt from ${promptPath}; do not start Codex via Bash.`
+        : `Launch a Codex native background agent/task with the prompt from ${promptPath}; do not start Codex via Bash.`;
     case "cursor-sdk":
       return "Use `swarm run <workspace>` for headless Cursor SDK execution.";
   }

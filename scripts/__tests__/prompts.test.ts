@@ -27,6 +27,7 @@ describe("swarm prompts", () => {
 
     expect(prompt).toContain('repositoryMode: "single"');
     expect(prompt).toContain('executor: "cursor-visible"');
+    expect(prompt).toContain("isolation:");
     expect(prompt).toContain("repositories: copy the available repositories below exactly");
     expect(prompt).toContain("Available repositories:");
   });
@@ -49,6 +50,7 @@ describe("swarm prompts", () => {
       rootSlug: "ship-feature",
       repositoryMode: "single",
       executor: "cursor-visible",
+      isolation: { mode: "worktree", network: "restricted" },
       repositories: [{ name: "platform", path: "/repo/platform", baseRef: "main" }],
       defaultRepo: "platform",
       baseRef: "main",
@@ -64,6 +66,7 @@ describe("swarm prompts", () => {
       repoPath: "/repo/platform",
       agent: "btl-frontend-track",
       branch: "swarm/ship-feature/build-ui",
+      isolation: { mode: "worktree", network: "restricted" },
       worktreePath: "/repo/.swarm/ship-feature/worktrees/platform/build-ui",
       agentId: null,
       runId: null,
@@ -84,6 +87,7 @@ describe("swarm prompts", () => {
     });
 
     expect(prompt).toContain("Use the full frontend agent instructions.");
+    expect(prompt).toContain("Isolation:\n- mode=worktree network=restricted");
     expect(prompt).not.toContain("Frontend implementation agent");
   });
 
@@ -105,6 +109,7 @@ describe("swarm prompts", () => {
       rootSlug: "audit-feature",
       repositoryMode: "single",
       executor: "cursor-visible",
+      isolation: { mode: "worktree", network: "restricted" },
       repositories: [{ name: "platform", path: "/repo/platform", baseRef: "main" }],
       defaultRepo: "platform",
       baseRef: "main",
@@ -119,6 +124,7 @@ describe("swarm prompts", () => {
       executor: "cursor-visible",
       repoPath: "/repo/platform",
       branch: "swarm/audit-feature/platform-checks",
+      isolation: { mode: "readonly", network: "none" },
       worktreePath: "/repo/.swarm/audit-feature/worktrees/platform/platform-checks",
       agentId: null,
       runId: null,

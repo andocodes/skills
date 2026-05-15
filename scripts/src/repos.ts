@@ -9,6 +9,8 @@ export interface DiscoveredRepo {
   name: string;
   path: string;
   baseRef: string;
+  authProfile?: string;
+  gitIdentity?: string;
 }
 
 export interface RepositoryContext {

@@ -1,9 +1,9 @@
 {
   "name": "@cursor-skill/swarm",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
-  "description": "Local worktree orchestration runtime for the /swarm skill.",
+  "description": "Local orchestration runtime for the swarm skill.",
   "scripts": {
     "cli": "bun cli.ts",
     "test": "bun test",

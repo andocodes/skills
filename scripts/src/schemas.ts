@@ -4,9 +4,71 @@ export const TASK_NAME_RE = /^[a-z0-9-]+$/;
 
 const taskName = z.string().regex(TASK_NAME_RE, "must be kebab-case ASCII");
 const nonEmpty = z.string().min(1);
+const profileRef = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(/^[A-Za-z0-9._@:/-]+$/, "must be a named local profile, not an inline secret");
 
 export const taskTypeSchema = z.enum(["worker", "verifier"]);
-export const executorSchema = z.enum(["cursor-visible", "cursor-sdk", "claude-cli", "codex-cli"]);
+export const executorSchema = z.enum([
+  "cursor-visible",
+  "cursor-sdk",
+  "claude-native",
+  "claude-cli",
+  "codex-native",
+  "codex-cli",
+]);
+export const isolationModeSchema = z.enum(["worktree", "container", "readonly"]);
+export const isolationRuntimeSchema = z.enum(["docker", "podman"]);
+export const isolationNetworkSchema = z.enum(["restricted", "none", "inherit"]);
+export const isolationSchema = z
+  .object({
+    mode: isolationModeSchema.default("worktree"),
+    runtime: isolationRuntimeSchema.optional(),
+    image: nonEmpty.optional(),
+    network: isolationNetworkSchema.default("restricted"),
+    readonly: z.boolean().optional(),
+    notes: z.string().optional(),
+  })
+  .superRefine((isolation, ctx) => {
+    if (
+      isolation.mode === "container" &&
+      isolation.runtime &&
+      isolation.runtime !== "docker" &&
+      isolation.runtime !== "podman"
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["runtime"],
+        message: "container isolation supports docker or podman",
+      });
+    }
+    if (
+      (isolation.mode === "worktree" || isolation.mode === "readonly") &&
+      isolation.runtime
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["runtime"],
+        message: `${isolation.mode} isolation does not use a runtime`,
+      });
+    }
+    if (
+      (isolation.mode === "worktree" || isolation.mode === "readonly") &&
+      isolation.image
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["image"],
+        message: `${isolation.mode} isolation does not use an image`,
+      });
+    }
+  });
+export const defaultIsolation = {
+  mode: "worktree",
+  network: "restricted",
+} satisfies z.infer<typeof isolationSchema>;
 export const taskStatusSchema = z.enum([
   "pending",
   "running",
@@ -22,6 +84,8 @@ export const repositorySchema = z.object({
   name: taskName,
   path: nonEmpty,
   baseRef: nonEmpty.default("main"),
+  authProfile: profileRef.optional(),
+  gitIdentity: profileRef.optional(),
 });
 
 export const planTaskSchema = z
@@ -31,6 +95,9 @@ export const planTaskSchema = z
     repo: taskName.optional(),
     agent: taskName.optional(),
     executor: executorSchema.optional(),
+    isolation: isolationSchema.optional(),
+    authProfile: profileRef.optional(),
+    gitIdentity: profileRef.optional(),
     model: nonEmpty.optional(),
     scopedGoal: nonEmpty,
     brief: z.string().optional(),
@@ -60,6 +127,9 @@ export const planSchema = z
     rootSlug: taskName,
     repositoryMode: z.enum(["single", "siblings"]).default("single"),
     executor: executorSchema.default("cursor-visible"),
+    isolation: isolationSchema.default(defaultIsolation),
+    authProfile: profileRef.optional(),
+    gitIdentity: profileRef.optional(),
     repositories: z.array(repositorySchema).default([]),
     defaultRepo: taskName.optional(),
     baseRef: nonEmpty.default("main"),
@@ -121,6 +191,9 @@ export const taskStateSchema = z.object({
   repoPath: nonEmpty,
   agent: taskName.optional(),
   executor: executorSchema.optional(),
+  isolation: isolationSchema.default(defaultIsolation),
+  authProfile: profileRef.optional(),
+  gitIdentity: profileRef.optional(),
   branch: nonEmpty,
   worktreePath: nonEmpty,
   agentId: z.string().nullable().default(null),
@@ -149,6 +222,8 @@ export type TaskState = z.infer<typeof taskStateSchema>;
 export type State = z.infer<typeof stateSchema>;
 export type TaskStatus = TaskState["status"];
 export type Executor = z.infer<typeof executorSchema>;
+export type Isolation = z.infer<typeof isolationSchema>;
+export type IsolationMode = z.infer<typeof isolationModeSchema>;
 
 export class SwarmValidationError extends Error {}
 

@@ -1,80 +1,111 @@
 # Swarm Operations
 
-This file keeps long-running behavior out of `SKILL.md`.
+This file keeps operational detail out of `SKILL.md`.
 
-## Visible Runs
+## Adapter Selection
 
-Default `/swarm` should use `cursor-visible`: Cursor subagents launched from the parent chat.
+Prefer the current harness's native adapter:
+
+- Cursor parent chat: `cursor-visible`
+- Claude Code parent chat: `claude-native`
+- Codex parent chat: `codex-native`
+
+Use `claude-cli` or `codex-cli` when a parent host intentionally starts a terminal-visible lane in another harness. Use `cursor-sdk` for unattended headless runs.
+
+Always announce the chosen executor, isolation mode, repository mode, `baseRef`, and max concurrency before spawning lanes.
+
+## Visible and Native Runs
+
+Create a workspace without launching hidden workers:
+
+```bash
+bun <skillDir>/scripts/cli.ts init "<goal>" --executor <executor> --isolation <mode>
+```
+
+The parent writes `plan.json`, prepares each ready task, and launches the returned `executor` using the returned `promptPath`:
+
+```bash
+bun <skillDir>/scripts/cli.ts prepare .swarm/<rootSlug> <task>
+```
+
+The lane writes `.swarm/<rootSlug>/handoffs/<task>.md`. Record it with:
+
+```bash
+bun <skillDir>/scripts/cli.ts complete .swarm/<rootSlug> <task>
+```
+
+For `cursor-visible`, use the first returned `cursorSubagentCandidates` entry that exists in the current Cursor session. For `claude-native` and `codex-native`, use the host's native background agent/task tool and do not start another CLI process from Bash. For CLI adapters, open the selected CLI in the task worktree and provide the prompt file.
+
+For command-backed CLI lanes, the local CLI can execute the generated launch plan:
+
+```bash
+bun <skillDir>/scripts/cli.ts launch .swarm/<rootSlug> <task>
+```
+
+`launch` runs `prepare`, executes `codex-cli` or `claude-cli` either on the host or inside the declared container image, and records the handoff when the lane exits. Use `--dry-run` to inspect the exact command without executing it, or `--no-complete` to leave completion to the parent.
+
+## Isolation Operation
+
+`worktree` mode creates the task worktree and branch, then runs directly in that checkout.
+
+`readonly` mode still prepares a checkout and prompt, but the lane must treat the checkout as read-only. Use it for architecture discovery, audits, and independent verification.
+
+`container` mode prepares the same task worktree, then the harness adapter should run Docker or Podman with:
+
+- only the task worktree mounted or cloned
+- the declared `network` policy
+- no ambient credentials when `authProfile` is set
+- only the named `gitIdentity` profile when one is set
+- durable output returned through git branch changes and the handoff file
+
+Container launch executes the selected CLI inside the image. The image must include `codex` or `claude`, git, shell utilities, and any profile resolver needed for the declared `authProfile` or `gitIdentity`. If no image is declared, the launcher uses `swarm-agent:0.1.0-codex-core`.
+
+Build images with:
+
+```bash
+bun <skillDir>/scripts/cli.ts image build codex-core
+bun <skillDir>/scripts/cli.ts image build claude-rust
+```
+
+Image tags follow `swarm-agent:<version>-<preset>`, such as `swarm-agent:0.1.0-codex-core`, `swarm-agent:0.1.0-claude-rust`, and `swarm-agent:0.1.0-fake`.
+
+## Headless Cursor SDK Runs
 
 Use:
 
 ```bash
-bun ~/.cursor/skills/swarm/scripts/cli.ts init "<goal>"
+bun <skillDir>/scripts/cli.ts run .swarm/<rootSlug> --max-runtime-sec 43200 --task-timeout-sec 1800
 ```
 
-Then the parent chat writes `plan.json`, prepares each ready task, and launches the requested executor from the returned prompt file:
-
-```bash
-bun ~/.cursor/skills/swarm/scripts/cli.ts prepare .swarm/<rootSlug> <task>
-```
-
-The visible subagent writes `.swarm/<rootSlug>/handoffs/<task>.md`. Record it with:
-
-```bash
-bun ~/.cursor/skills/swarm/scripts/cli.ts complete .swarm/<rootSlug> <task>
-```
-
-Use `cursor-visible` when the operator is actively working in Cursor and wants to inspect worker reasoning, tool calls, and blockers in the chat UI. `prepare` returns `cursorSubagentCandidates`: try the task `agent` first if it is available in this Cursor session, then fall back to `generalPurpose`.
-
-Use `claude-cli` or `codex-cli` when the same swarm task should run in a terminal-visible lane. If that host has a matching native agent/persona, use it; otherwise run the default CLI session with the prompt file. Those executors still use the same worktree, prompt file, handoff file, and `complete` step; they just do not appear as native Cursor subagent chats.
-
-## Headless Overnight Runs
-
-Use:
-
-```bash
-bun ~/.cursor/skills/swarm/scripts/cli.ts run .swarm/<rootSlug> --max-runtime-sec 43200 --task-timeout-sec 1800
-```
-
-The headless SDK runner is the heartbeat:
+The headless SDK runner:
 
 - Re-reads `state.json` between sweeps.
 - Recovers persisted local SDK `runId` values when possible.
 - Spawns ready pending tasks up to `plan.maxConcurrency`.
 - Writes `attention.log` when recovery, handoff, or task status needs operator review.
 - Exits with a non-zero code when any task is blocked, failed, cancelled, or still pending at checkpoint.
-- Fails tasks that stay running longer than `--task-timeout-sec`, writing a failure handoff instead of leaving zombie state.
+- Fails tasks that stay running longer than `--task-timeout-sec`, writing a failure handoff.
 
-Rerunning the same command is the recovery path. The runner reconciles `plan.json` and `state.json` before each loop.
+Rerun the same command to recover. The runner reconciles `plan.json` and `state.json` before each loop.
 
-For repeated local SDK transport errors such as `NGHTTP2_FRAME_SIZE_ERROR`, prefer a bounded run:
+## Cursor SDK Auth
 
-```bash
-bun ~/.cursor/skills/swarm/scripts/cli.ts run .swarm/<rootSlug> --task-timeout-sec 600
-```
-
-If no handoff arrives within the timeout, the task is marked `error` with a generated failure handoff. The runner also writes prompt-size diagnostics under `logs/` so SDK failures can be investigated without changing prompt behavior.
-
-Kickoff writes `.swarm/<rootSlug>/kickoff.json` before the planner completes, then updates it with planner `agentId`/`runId` and terminal status. If kickoff appears silent, inspect that file before restarting.
-
-## Auth
-
-There is no separate local-login auth mode in the Cursor SDK. Local agents still need a valid API key.
+There is no separate local-login auth mode in the Cursor SDK. Local SDK agents need a valid API key.
 
 Run:
 
 ```bash
-bun ~/.cursor/skills/swarm/scripts/cli.ts auth
+bun <skillDir>/scripts/cli.ts auth
 ```
 
-This calls `Cursor.me()` and `Cursor.models.list()` with the exact `CURSOR_API_KEY` visible to the process. If it returns `AuthenticationError: unauthenticated`, refresh the key from Cursor Dashboard > Integrations and export it again in the same shell that starts `/swarm`.
+This calls `Cursor.me()` and `Cursor.models.list()` with the exact `CURSOR_API_KEY` visible to the process. If it returns `AuthenticationError: unauthenticated`, refresh the key from Cursor Dashboard > Integrations and export it again in the same shell that starts the run.
 
 ## Side-By-Side Repositories
 
-For workspaces like `BTL/` where child folders are independent git repos:
+For a workspace containing independent child repos:
 
 ```bash
-bun ~/.cursor/skills/swarm/scripts/cli.ts kickoff "<goal>" --repo-mode siblings
+bun <skillDir>/scripts/cli.ts init "<goal>" --repo-mode siblings
 ```
 
 The planner receives all child git repositories and should set `repo` on each task:
@@ -101,35 +132,22 @@ Workers branch from the selected repo's `baseRef`. They do not see uncommitted l
 If current WIP matters, create a WIP branch or commit first, then pass that ref:
 
 ```bash
-bun ~/.cursor/skills/swarm/scripts/cli.ts kickoff "<goal>" --repo-mode siblings --base-ref wip/my-branch
+bun <skillDir>/scripts/cli.ts init "<goal>" --repo-mode siblings --base-ref wip/my-branch
 ```
 
 This keeps every task reproducible: the planner, worktrees, and handoffs all point back to a real git ref instead of a captured local patch.
 
 ## Prompt Diagnostics
 
-Swarm sends the full generated prompt and selected agent definitions to the SDK. It does not shrink prompts to work around transport errors.
-
-For each planner or task launch, the runner writes `logs/<name>-prompt.json` with prompt and SDK-agent payload byte counts. Failure handoffs include the same diagnostics plus the SDK error name/message when available.
-
-## Planning Shape
-
-Borrow from `.planning` only where it improves continuity:
-
-- Use one durable state file, not many chat notes.
-- Store handoffs as markdown artifacts.
-- Keep decisions and blockers explicit in `attention.log`.
-- Keep project-level roadmaps in the project, not inside this skill.
-
-The skill should stay generic. Project-specific milestone language belongs in task prompts, `.planning`, or `.cursor/agents`.
+For each planner or task launch, the runner writes `logs/<name>-prompt.json` with prompt byte counts, selected model/agent information, executor, isolation mode, runtime, and identity profile names. Failure handoffs include diagnostics plus the SDK error name/message when available.
 
 ## Inbox
 
 The inbox is parent-mediated coordination, not direct worker chat:
 
 ```bash
-bun ~/.cursor/skills/swarm/scripts/cli.ts note .swarm/<rootSlug> "Need contract decision before wiring platform" --task platform-ui --priority blocked
-bun ~/.cursor/skills/swarm/scripts/cli.ts inbox .swarm/<rootSlug>
+bun <skillDir>/scripts/cli.ts note .swarm/<rootSlug> "Need contract decision before wiring platform" --task platform-ui --priority blocked
+bun <skillDir>/scripts/cli.ts inbox .swarm/<rootSlug>
 ```
 
 Messages live in `.swarm/<rootSlug>/messages/inbox.jsonl`.
@@ -138,4 +156,4 @@ Messages live in `.swarm/<rootSlug>/messages/inbox.jsonl`.
 - `--audience task --task <name>` is injected into that task prompt.
 - `--audience all` is injected into all future task prompts.
 
-Keep notes short. Durable implementation detail still belongs in handoffs.
+Keep notes short. Durable implementation detail belongs in handoffs.

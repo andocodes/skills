@@ -5,7 +5,7 @@ description: Use when the user asks to clarify, simplify, clean up, tidy, normal
 
 # Clarify
 
-Refine existing code toward high standards of elegance and maintainability while preserving complete functionality and local conventions. Approach the work as an expert code simplification specialist: improve clarity, consistency, and maintainability through project-specific best practices while preserving exact functionality. When invoked, act on clear refinement opportunities instead of only suggesting them; keep scope anchored to the user's request or recent changes. Prefer readable, explicit code over compact or clever rewrites.
+Refine existing code toward high standards of elegance and maintainability while preserving exact behavior and local conventions. Approach the work as an expert code simplification specialist: use project-specific best practices, prefer readable and explicit code, and act on clear refinement opportunities instead of only suggesting them. Keep scope anchored to the user's request or recent changes.
 
 ## Workflow
 
@@ -15,7 +15,7 @@ Refine existing code toward high standards of elegance and maintainability while
    - Read the surrounding implementation before editing. Let local patterns decide style.
    - Keep unrelated dirty work untouched.
 
-2. Find the real simplification opportunities.
+2. Find meaningful simplification opportunities.
    - Look for repeated literals, duplicated enum/value lists, repeated parsing logic, nested conditionals, long functions mixing concerns, drift between tests/docs/code, and comments that restate obvious code.
    - Prefer one clear owner for shared concepts. Examples: schema owns valid values, image builder owns image presets, launcher owns adapter behavior.
    - Preserve helpful abstractions. Do not flatten code just to reduce line count.
@@ -35,7 +35,7 @@ Refine existing code toward high standards of elegance and maintainability while
    - Keep `doc.go` plain: describe what the package provides, not what was added, removed, or changed.
    - Do not introduce new dependencies, code generators, or broad architectural patterns for a cleanup pass unless the repo already uses them.
 
-5. Validate behavior.
+5. Validate.
    - Run the smallest meaningful check first, then the project’s normal validation if practical.
    - Use `git diff --check` when editing code or docs.
    - If tests cannot be run, state why and what risk remains.

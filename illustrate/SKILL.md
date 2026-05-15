@@ -1,20 +1,20 @@
 ---
 name: illustrate
-description: Use when the user asks to illustrate, make concrete, explain by example, compare options, show directions, visualize a concept, map a trade-off, or help them understand an idea just introduced in conversation. Especially useful during planning, architecture discussion, Grill Me sessions, decision-making, framework choices, product trade-offs, and abstract technical explanations. Use sense checks only when the user explicitly asks for checkpoints, tick-offs, a walkthrough, teaching mode, or similar.
+description: Use when the user asks to illustrate, make concrete, explain by example, compare options, show directions, visualize a concept, map a trade-off, or understand an idea introduced in conversation. Especially useful during planning, architecture discussion, probe sessions, decision-making, framework choices, product trade-offs, and abstract technical explanations. Use sense checks only when the user explicitly asks for checkpoints, tick-offs, a walkthrough, teaching mode, or similar.
 ---
 
 # Illustrate
 
-Make an abstract concept, option set, trade-off, or decision branch concrete enough for the user to reason about. Prefer concise examples, contrasts, and dialogue over long exposition.
+Make an abstract concept, option set, trade-off, or decision branch concrete enough to reason about. Prefer concise examples, contrasts, and dialogue over long exposition.
 
-## Core Workflow
+## Workflow
 
 1. Identify what needs to become concrete.
    - Restate the concept or decision in one short sentence when useful.
    - If the context is missing, ask for the smallest missing detail.
    - If the user asks during another skill workflow, preserve that workflow's goal and use `illustrate` as a supporting move.
 
-2. Choose the lightest useful form.
+2. Choose the lightest useful format.
    - Use option cards when comparing paths.
    - Use tiny scenarios when an abstract idea needs a real-world shape.
    - Use contrast tables when trade-offs across options matter.
@@ -36,10 +36,10 @@ Use sense checks only when the user explicitly asks for checkpoints, tick-offs, 
 
 When active:
 
-- Break the explanation into small chunks.
-- After each chunk or at the end, ask a lightweight check such as "Can we tick off why option A is attractive?" or "Which part still feels fuzzy: lifecycle, cost, or operational risk?"
-- Do not quiz the user or make the interaction feel remedial.
-- Treat the user's answer as a signal for what to clarify next.
+- Explain in small chunks.
+- After a chunk or at the end, ask a lightweight check such as "Can we tick off why option A is attractive?" or "Which part still feels fuzzy: lifecycle, cost, or operational risk?"
+- Keep the interaction collaborative, not remedial.
+- Use the user's answer to choose what to clarify next.
 
 ## Visual Escalation
 
@@ -82,4 +82,4 @@ Why it matters:
 - Stay concise and concrete.
 - Prefer three strong examples over ten shallow ones.
 - Preserve uncertainty where the scenario is under-specified.
-- Do not derail an active Grill Me session; illustrate the concept, then return to the riskiest unresolved branch.
+- Do not derail an active probe or pressure-test session; illustrate the concept, then return to the riskiest unresolved branch.

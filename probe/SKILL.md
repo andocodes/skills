@@ -5,24 +5,24 @@ description: Use when the user asks to probe, pressure-test, stress-test, grill,
 
 # Probe
 
-Pressure-test a plan through focused, opinionated questions. Be rigorous and direct, but keep the dialogue collaborative and useful.
+Pressure-test a plan with focused, opinionated questions. Be rigorous and direct, but keep the dialogue collaborative and useful.
 
-## Core Workflow
+## Workflow
 
-1. Ground yourself first.
+1. Ground first.
    - If the topic touches a repository, inspect relevant code, docs, tests, configs, issues, and recent changes before asking.
    - Use `rg`, `rg --files`, `git diff`, tests, and targeted file reads where useful.
    - Do not ask questions that provided artifacts or local code already answer.
 
 2. Build the decision model.
    - Identify the trunk: the main decision or plan under pressure.
-   - Identify likely branches: security, correctness, compatibility, UX, rollout, operations, cost, ownership, or alternatives.
+   - Identify likely branches: correctness, security, compatibility, edge cases, operations, UX, maintenance, ownership, or alternatives.
    - If context is too vague, ask for the smallest missing piece needed to begin.
 
 3. Set a probe budget.
    - Default to `Probes left: 5`.
    - Use `3` for a quick probe and `7-9` for a deep probe when the user asks.
-   - One probe is one decision pressure point, not necessarily one sentence.
+   - One probe is one decision pressure point, not one sentence.
    - If a new serious branch appears, say whether you are spending existing budget or adding one.
 
 4. Ask one primary question at a time.
@@ -37,7 +37,7 @@ Pressure-test a plan through focused, opinionated questions. Be rigorous and dir
    - When a branch resolves, roll the decision back up into the trunk before continuing.
    - Track confirmed decisions separately from assumptions.
 
-6. Stop when the tree is resolved enough.
+6. Close when the tree is resolved enough.
    - Summarize the agreed plan, confirmed decisions, assumptions, unresolved risks, and next move.
    - If the plan is weak, say so plainly and name the highest-leverage change.
 

@@ -28,7 +28,7 @@ RUN if [[ "$SWARM_AGENT_TOOLCHAIN" == "go" ]]; then \
     apt-get update && apt-get install -y --no-install-recommends golang-go && rm -rf /var/lib/apt/lists/*; \
   fi
 
-RUN if [[ "$SWARM_AGENT_HARNESS" == "codex" || "$SWARM_AGENT_HARNESS" == "claude" ]]; then \
+RUN if [[ "$SWARM_AGENT_HARNESS" == "codex" || "$SWARM_AGENT_HARNESS" == "claude" || "$SWARM_AGENT_HARNESS" == "pi" ]]; then \
     curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
     npm install -g npm@latest; \
@@ -40,6 +40,8 @@ RUN if [[ "$SWARM_AGENT_HARNESS" == "codex" ]]; then \
     npm install -g @openai/codex; \
   elif [[ "$SWARM_AGENT_HARNESS" == "claude" ]]; then \
     npm install -g @anthropic-ai/claude-code; \
+  elif [[ "$SWARM_AGENT_HARNESS" == "pi" ]]; then \
+    npm install -g @earendil-works/pi-coding-agent; \
   elif [[ "$SWARM_AGENT_HARNESS" == "fake" ]]; then \
     cp /usr/local/share/swarm/fake-agent.sh /usr/local/bin/codex && \
     chmod +x /usr/local/bin/codex && \

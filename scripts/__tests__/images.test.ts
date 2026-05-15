@@ -13,6 +13,13 @@ describe("image build plans", () => {
     expect(result.command).toContain("SWARM_AGENT_TOOLCHAIN=go");
   });
 
+  test("builds Pi image presets", () => {
+    const result = buildImage({ preset: "pi-rust", dryRun: true });
+    expect(result.tag).toBe("swarm-agent:0.1.0-pi-rust");
+    expect(result.command).toContain("SWARM_AGENT_HARNESS=pi");
+    expect(result.command).toContain("SWARM_AGENT_TOOLCHAIN=rust");
+  });
+
   test("rejects unknown presets", () => {
     expect(() => parseImagePreset("node-party")).toThrow();
   });

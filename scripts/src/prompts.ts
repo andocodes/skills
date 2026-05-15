@@ -40,7 +40,7 @@ Plan contract:
 - baseRef: "${args.baseRef}" unless you have a strong reason to use another existing ref.
 - maxConcurrency: 1-4, default 2.
 - tasks: worker and verifier tasks with kebab-case names.
-- A task may set executor to cursor-visible, cursor-sdk, claude-native, claude-cli, codex-native, or codex-cli.
+- A task may set executor to cursor-visible, cursor-sdk, claude-native, claude-cli, codex-native, codex-cli, or pi-cli.
 - A task may set isolation to { "mode": "worktree" }, { "mode": "container", "runtime": "docker" }, { "mode": "container", "runtime": "podman" }, or { "mode": "readonly" }. Container tasks may set readonly: true to mount the checkout read-only while still allowing handoff writes.
 - A task may set authProfile or gitIdentity only as named local profiles. Never inline tokens, private keys, or secret values.
 - In sibling repo mode, set task.repo for every task. Paths are relative to that repo.

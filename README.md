@@ -36,7 +36,7 @@ bun install
 bun run check
 ```
 
-`CURSOR_API_KEY` is only required for `cursor-sdk` headless execution. Native Cursor, Claude, Codex, and terminal CLI lanes use prompt files and handoffs.
+`CURSOR_API_KEY` is only required for `cursor-sdk` headless execution. Native Cursor, Claude, Codex, Pi, and terminal CLI lanes use prompt files and handoffs.
 
 ## Harness Adapters
 
@@ -46,6 +46,7 @@ bun run check
 - `claude-cli`: terminal-visible Claude Code CLI lane launched from another host.
 - `codex-native`: native Codex background agent/task lane.
 - `codex-cli`: terminal-visible Codex CLI lane launched from another host.
+- `pi-cli`: terminal-visible Pi CLI lane launched from another host.
 
 Use the current host's native adapter by default. Use CLI adapters only when intentionally launching another host from a terminal. Use `cursor-sdk` for unattended runs.
 
@@ -112,6 +113,7 @@ Build agent images:
 ```bash
 bun <skillDir>/scripts/cli.ts image build codex-core
 bun <skillDir>/scripts/cli.ts image build claude-rust
+bun <skillDir>/scripts/cli.ts image build pi-go
 bun <skillDir>/scripts/cli.ts image build fake --tag swarm-agent:0.1.0-fake
 ```
 
@@ -120,6 +122,7 @@ Set stronger isolation defaults:
 ```bash
 bun <skillDir>/scripts/cli.ts init "<goal>" --isolation container --isolation-runtime docker --isolation-image swarm-agent:0.1.0-codex-core
 bun <skillDir>/scripts/cli.ts init "<goal>" --isolation container --isolation-runtime podman --isolation-image swarm-agent:0.1.0-claude-rust --network none
+bun <skillDir>/scripts/cli.ts init "<goal>" --executor pi-cli --isolation container --isolation-runtime docker --isolation-image swarm-agent:0.1.0-pi-core
 ```
 
 Inspect state:

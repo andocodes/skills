@@ -18,6 +18,7 @@ export const executorSchema = z.enum([
   "claude-cli",
   "codex-native",
   "codex-cli",
+  "pi-cli",
 ]);
 export const isolationModeSchema = z.enum(["worktree", "container", "readonly"]);
 export const isolationRuntimeSchema = z.enum(["docker", "podman"]);

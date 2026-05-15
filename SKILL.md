@@ -20,14 +20,14 @@ Swarm is a portable local orchestration contract. It decomposes a large goal int
 
 Swarm has two adapter layers:
 
-- **Harness adapter**: how a lane is launched: `cursor-visible`, `cursor-sdk`, `claude-native`, `claude-cli`, `codex-native`, or `codex-cli`.
+- **Harness adapter**: how a lane is launched: `cursor-visible`, `cursor-sdk`, `claude-native`, `claude-cli`, `codex-native`, `codex-cli`, or `pi-cli`.
 - **Isolation adapter**: where a lane runs: `worktree`, `container`, or `readonly`.
 
 Auto-select adapters in this order:
 
 1. Use any explicit user override.
 2. Prefer the current host's native visible/background lane: Cursor uses `cursor-visible`, Claude Code uses `claude-native`, Codex uses `codex-native`.
-3. Use `claude-cli` or `codex-cli` only when intentionally launching another host from a terminal.
+3. Use `claude-cli`, `codex-cli`, or `pi-cli` only when intentionally launching another host from a terminal.
 4. Use `cursor-sdk` only for unattended or headless runs.
 
 Announce the selected harness, isolation mode, repository mode, and concurrency before launching lanes.

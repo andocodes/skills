@@ -1031,6 +1031,12 @@ function executorInstructions(executor: Executor): string {
         "- You are running from a Codex CLI process started by another host.",
         "- Stream useful progress in the terminal and keep durable conclusions in the handoff.",
       ].join("\n");
+    case "pi-cli":
+      return [
+        "Executor: pi-cli",
+        "- You are running from a Pi CLI process started by another host.",
+        "- Stream useful progress in the terminal and keep durable conclusions in the handoff.",
+      ].join("\n");
     case "codex-native":
       return [
         "Executor: codex-native",
@@ -1095,6 +1101,10 @@ function launchInstruction(executor: Executor, promptPath: string, agent: string
       return agent
         ? `Open Codex CLI in the worktree. If a matching Codex agent/persona named "${agent}" is available, use it; otherwise provide the prompt from ${promptPath} to the default Codex CLI session.`
         : `Open Codex CLI in the worktree and provide the prompt from ${promptPath}.`;
+    case "pi-cli":
+      return agent
+        ? `Open Pi CLI in the worktree. If a matching Pi skill/persona named "${agent}" is available, use it; otherwise provide the prompt from ${promptPath} to the default Pi CLI session.`
+        : `Open Pi CLI in the worktree and provide the prompt from ${promptPath}.`;
     case "codex-native":
       return agent
         ? `Launch a Codex native background agent/task for this lane. If a matching native agent/persona named "${agent}" is available, use it; otherwise use the default native agent. Give it the prompt from ${promptPath}; do not start Codex via Bash.`

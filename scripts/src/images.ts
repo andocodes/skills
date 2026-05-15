@@ -7,10 +7,13 @@ export const SWARM_IMAGE_VERSION = "0.1.0";
 export type ImagePreset =
   | "codex-core"
   | "claude-core"
+  | "pi-core"
   | "codex-rust"
   | "claude-rust"
+  | "pi-rust"
   | "codex-go"
   | "claude-go"
+  | "pi-go"
   | "fake";
 
 export interface ImageBuildOptions {
@@ -70,16 +73,19 @@ export function parseImagePreset(value: string): ImagePreset {
   if (
     value === "codex-core" ||
     value === "claude-core" ||
+    value === "pi-core" ||
     value === "codex-rust" ||
     value === "claude-rust" ||
+    value === "pi-rust" ||
     value === "codex-go" ||
     value === "claude-go" ||
+    value === "pi-go" ||
     value === "fake"
   ) {
     return value;
   }
   throw new Error(
-    `expected image preset codex-core, claude-core, codex-rust, claude-rust, codex-go, claude-go, or fake; got ${value}`
+    `expected image preset codex-core, claude-core, pi-core, codex-rust, claude-rust, pi-rust, codex-go, claude-go, pi-go, or fake; got ${value}`
   );
 }
 

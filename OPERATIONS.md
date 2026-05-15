@@ -10,7 +10,7 @@ Prefer the current harness's native adapter:
 - Claude Code parent chat: `claude-native`
 - Codex parent chat: `codex-native`
 
-Use `claude-cli` or `codex-cli` when a parent host intentionally starts a terminal-visible lane in another harness. Use `cursor-sdk` for unattended headless runs.
+Use `claude-cli`, `codex-cli`, or `pi-cli` when a parent host intentionally starts a terminal-visible lane in another harness. Use `cursor-sdk` for unattended headless runs.
 
 Always announce the chosen executor, isolation mode, repository mode, `baseRef`, and max concurrency before spawning lanes.
 
@@ -42,7 +42,7 @@ For command-backed CLI lanes, the local CLI can execute the generated launch pla
 bun <skillDir>/scripts/cli.ts launch .swarm/<rootSlug> <task>
 ```
 
-`launch` runs `prepare`, executes `codex-cli` or `claude-cli` either on the host or inside the declared container image, and records the handoff when the lane exits. Use `--dry-run` to inspect the exact command without executing it, or `--no-complete` to leave completion to the parent.
+`launch` runs `prepare`, executes `codex-cli`, `claude-cli`, or `pi-cli` either on the host or inside the declared container image, and records the handoff when the lane exits. Use `--dry-run` to inspect the exact command without executing it, or `--no-complete` to leave completion to the parent.
 
 ## Isolation Operation
 
@@ -58,16 +58,17 @@ bun <skillDir>/scripts/cli.ts launch .swarm/<rootSlug> <task>
 - only the named `gitIdentity` profile when one is set
 - durable output returned through git branch changes and the handoff file
 
-Container launch executes the selected CLI inside the image. The image must include `codex` or `claude`, git, shell utilities, and any profile resolver needed for the declared `authProfile` or `gitIdentity`. If no image is declared, the launcher uses `swarm-agent:0.1.0-codex-core`.
+Container launch executes the selected CLI inside the image. The image must include `codex`, `claude`, or `pi`, git, shell utilities, and any profile resolver needed for the declared `authProfile` or `gitIdentity`. If no image is declared, the launcher chooses the matching core image for the selected executor.
 
 Build images with:
 
 ```bash
 bun <skillDir>/scripts/cli.ts image build codex-core
 bun <skillDir>/scripts/cli.ts image build claude-rust
+bun <skillDir>/scripts/cli.ts image build pi-go
 ```
 
-Image tags follow `swarm-agent:<version>-<preset>`, such as `swarm-agent:0.1.0-codex-core`, `swarm-agent:0.1.0-claude-rust`, and `swarm-agent:0.1.0-fake`.
+Image tags follow `swarm-agent:<version>-<preset>`, such as `swarm-agent:0.1.0-codex-core`, `swarm-agent:0.1.0-claude-rust`, `swarm-agent:0.1.0-pi-go`, and `swarm-agent:0.1.0-fake`.
 
 ## Headless Cursor SDK Runs
 

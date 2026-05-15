@@ -66,6 +66,29 @@ describe("launch plans", () => {
     expect(plan.command).not.toContain("--dangerously-bypass-approvals-and-sandbox");
   });
 
+  test("builds host Pi CLI command with readonly tool allowlist", () => {
+    const readonlyState: TaskState = {
+      ...state,
+      isolation: { mode: "readonly", network: "none" },
+    };
+    const plan = buildLaunchPlan({
+      executor: "pi-cli",
+      isolation: readonlyState.isolation,
+      taskState: readonlyState,
+      workspace: "/repo/.swarm/root",
+      root: "/repo",
+      promptPath: "/repo/.swarm/root/logs/build-ui-prompt.md",
+      handoffPath: "/repo/.swarm/root/handoffs/build-ui.md",
+      launchInstruction: "launch pi",
+    });
+
+    expect(plan.kind).toBe("command");
+    expect(plan.command?.slice(0, 3)).toEqual(["pi", "-p", "--no-session"]);
+    expect(plan.command).toContain("--tools");
+    expect(plan.command).toContain("read,grep,find,ls");
+    expect(plan.stdinFile).toBe("/repo/.swarm/root/logs/build-ui-prompt.md");
+  });
+
   test("builds container CLI command that runs inside the image", () => {
     const containerState: TaskState = {
       ...state,
@@ -92,6 +115,30 @@ describe("launch plans", () => {
     expect(plan.command).toContain("--network");
     expect(plan.command).toContain("none");
     expect(plan.commandPreview).toContain("claude --print");
+  });
+
+  test("defaults Pi container lanes to a Pi agent image", () => {
+    const containerState: TaskState = {
+      ...state,
+      isolation: {
+        mode: "container",
+        runtime: "docker",
+        network: "none",
+      },
+    };
+    const plan = buildLaunchPlan({
+      executor: "pi-cli",
+      isolation: containerState.isolation,
+      taskState: containerState,
+      workspace: "/repo/.swarm/root",
+      root: "/repo",
+      promptPath: "/repo/.swarm/root/logs/build-ui-prompt.md",
+      handoffPath: "/repo/.swarm/root/handoffs/build-ui.md",
+      launchInstruction: "launch pi",
+    });
+
+    expect(plan.command).toContain("swarm-agent:0.1.0-pi-core");
+    expect(plan.commandPreview).toContain("pi -p --no-session");
   });
 
   test("mounts profiles without exposing auth values in launch plan", () => {

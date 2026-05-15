@@ -109,7 +109,7 @@ function hostCliPlan(args: BuildLaunchPlanArgs): LaunchPlan {
 function containerCliPlan(args: BuildLaunchPlanArgs): LaunchPlan {
   const profileFiles = resolveProfileFiles(args.taskState);
   const runtime = args.isolation.runtime ?? "docker";
-  const image = args.isolation.image ?? "swarm-agent:0.1.0-codex-core";
+  const image = args.isolation.image ?? defaultImageForExecutor(args.executor);
   const readonly = isReadonly(args.isolation);
   const command = [
     runtime,
@@ -157,7 +157,7 @@ function containerCliPlan(args: BuildLaunchPlanArgs): LaunchPlan {
     image,
     "sh",
     "-lc",
-    containerScript(args.executor),
+    containerScript(args.executor, readonly),
   ];
 
   return {
@@ -199,16 +199,17 @@ function hostCliCommand(executor: Executor, worktreePath: string, readonly: bool
             "Edit,MultiEdit,Write,NotebookEdit",
           ]
         : ["claude", "--print", "--dangerously-skip-permissions", "--input-format", "text"];
+    case "pi-cli":
+      return readonly
+        ? ["pi", "-p", "--no-session", "--tools", "read,grep,find,ls"]
+        : ["pi", "-p", "--no-session"];
     default:
       throw new Error(`${executor} is not a CLI executor`);
   }
 }
 
-function containerScript(executor: Executor): string {
-  const command =
-    executor === "codex-cli"
-      ? 'codex exec --cd "$SWARM_WORKTREE" --dangerously-bypass-approvals-and-sandbox - < "$SWARM_PROMPT"'
-      : 'claude --print --dangerously-skip-permissions --input-format text < "$SWARM_PROMPT"';
+function containerScript(executor: Executor, readonly: boolean): string {
+  const command = containerCliCommand(executor, readonly);
   return [
     "set -eu",
     'mkdir -p "$(dirname "$SWARM_HANDOFF")" /tmp/swarm-home',
@@ -218,6 +219,31 @@ function containerScript(executor: Executor): string {
     'if [ -n "${SWARM_GIT_IDENTITY:-}" ]; then echo "[swarm] git identity: $SWARM_GIT_IDENTITY" >&2; fi',
     command,
   ].join("\n");
+}
+
+function containerCliCommand(executor: Executor, readonly: boolean): string {
+  switch (executor) {
+    case "codex-cli":
+      return readonly
+        ? 'codex exec --cd "$SWARM_WORKTREE" --sandbox read-only - < "$SWARM_PROMPT"'
+        : 'codex exec --cd "$SWARM_WORKTREE" --dangerously-bypass-approvals-and-sandbox - < "$SWARM_PROMPT"';
+    case "claude-cli":
+      return readonly
+        ? 'claude --print --input-format text --permission-mode plan --disallowedTools Edit,MultiEdit,Write,NotebookEdit < "$SWARM_PROMPT"'
+        : 'claude --print --dangerously-skip-permissions --input-format text < "$SWARM_PROMPT"';
+    case "pi-cli":
+      return readonly
+        ? 'pi -p --no-session --tools read,grep,find,ls < "$SWARM_PROMPT"'
+        : 'pi -p --no-session < "$SWARM_PROMPT"';
+    default:
+      throw new Error(`${executor} is not a CLI executor`);
+  }
+}
+
+function defaultImageForExecutor(executor: Executor): string {
+  if (executor === "claude-cli") return "swarm-agent:0.1.0-claude-core";
+  if (executor === "pi-cli") return "swarm-agent:0.1.0-pi-core";
+  return "swarm-agent:0.1.0-codex-core";
 }
 
 function networkArgs(isolation: Isolation): string[] {

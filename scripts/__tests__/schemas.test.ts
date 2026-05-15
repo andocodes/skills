@@ -101,6 +101,24 @@ describe("plan schema", () => {
     expect(plan.tasks[0].authProfile).toBe("github-oss");
   });
 
+  test("accepts pi-cli executor", () => {
+    const plan = parsePlanJson(
+      JSON.stringify({
+        goal: "use pi",
+        rootSlug: "use-pi",
+        executor: "pi-cli",
+        tasks: [
+          {
+            name: "pi-worker",
+            scopedGoal: "Run this lane through Pi CLI",
+          },
+        ],
+      })
+    );
+
+    expect(plan.executor).toBe("pi-cli");
+  });
+
   test("rejects unknown isolation modes", () => {
     expect(() =>
       parsePlanJson(

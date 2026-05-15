@@ -25,7 +25,11 @@ const image = program.command("image").description("Build swarm agent container 
 
 image
   .command("build")
-  .argument("[preset]", "Image preset: codex-core, claude-core, codex-rust, claude-rust, codex-go, claude-go, or fake", "codex-core")
+  .argument(
+    "[preset]",
+    "Image preset: codex-core, claude-core, pi-core, codex-rust, claude-rust, pi-rust, codex-go, claude-go, pi-go, or fake",
+    "codex-core"
+  )
   .option("--runtime <runtime>", "Container builder runtime: docker or podman", parseContainerRuntime, "docker")
   .option("--tag <tag>", "Override image tag")
   .option("--dry-run", "Print build command without running it")
@@ -48,7 +52,7 @@ program
   .option("--base-ref <ref>", "Base ref for task worktrees")
   .option(
     "--executor <executor>",
-    "Default executor: cursor-visible, cursor-sdk, claude-native, claude-cli, codex-native, or codex-cli",
+    "Default executor: cursor-visible, cursor-sdk, claude-native, claude-cli, codex-native, codex-cli, or pi-cli",
     "cursor-visible"
   )
   .option(
@@ -91,7 +95,7 @@ program
   .option("--model <model>", "Planner model id", "default")
   .option(
     "--executor <executor>",
-    "Default executor: cursor-visible, cursor-sdk, claude-native, claude-cli, codex-native, or codex-cli",
+    "Default executor: cursor-visible, cursor-sdk, claude-native, claude-cli, codex-native, codex-cli, or pi-cli",
     "cursor-sdk"
   )
   .option(
@@ -284,12 +288,13 @@ function parseExecutor(value: string): Executor {
     value === "claude-native" ||
     value === "claude-cli" ||
     value === "codex-native" ||
-    value === "codex-cli"
+    value === "codex-cli" ||
+    value === "pi-cli"
   ) {
     return value;
   }
   throw new Error(
-    `expected executor cursor-visible, cursor-sdk, claude-native, claude-cli, codex-native, or codex-cli; got ${value}`
+    `expected executor cursor-visible, cursor-sdk, claude-native, claude-cli, codex-native, codex-cli, or pi-cli; got ${value}`
   );
 }
 

@@ -19,6 +19,7 @@ Write reader-ready project documentation. Keep it concise, verified, and useful:
    - Inspect existing README/docs, package metadata, CLI help, config schemas, tests, examples, public APIs, source comments, and recent diffs when relevant.
    - Write verified claims only. Omit uncertain claims, label them as assumptions, or ask for confirmation.
    - Prefer project commands, options, examples, and terminology.
+   - Do not assume the reader's OS, shell, harness, home directory layout, package manager, or installed tools unless the project requires them.
    - Preserve accurate existing documentation instead of rewriting for novelty.
 
 3. Choose the structure.
@@ -31,6 +32,7 @@ Write reader-ready project documentation. Keep it concise, verified, and useful:
 4. Write minimum sufficient docs.
    - Use the shortest documentation that lets the target reader act correctly.
    - Prefer present tense, active voice, concrete commands, examples, and direct section headings.
+   - Mark environment-specific commands as examples or provide alternatives when paths, shells, or tools vary across platforms.
    - Put the happy path before internals. Link or defer deeper details when they are not needed for first use.
    - Cut filler, marketing language, apologies, and meta-commentary.
 

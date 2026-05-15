@@ -31,17 +31,22 @@ Existing non-matching files or links are left untouched.
 | `probe` | Pressure-testing plans with focused questions and a visible decision path. |
 | `swarm` | Orchestrating explicit multi-agent work through lanes, adapters, state, and handoffs. |
 
-## Validation
+## Checks
 
-Validate a skill with the Codex skill validator:
+Skills are portable Markdown directories. Before committing changes, run the checks your environment supports.
+
+Useful checks for this repository:
 
 ```bash
-uv run --with pyyaml python ~/.codex/skills/.system/skill-creator/scripts/quick_validate.py ~/.skills/<skill>
+bash -n install.sh
+git diff --check
 ```
 
-For `swarm`, run its script checks from the skill package:
+For skills with their own code or tests, run their local checks. For `swarm`:
 
 ```bash
 cd ~/.skills/swarm/scripts
 bun run check
 ```
+
+If your harness provides a skill validator, run it against the changed skill directories.

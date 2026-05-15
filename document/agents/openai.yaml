@@ -1,0 +1,4 @@
+interface:
+  display_name: "Document"
+  short_description: "Write concise, verified project docs"
+  default_prompt: "Use $document to write concise, verified project documentation for this repo."

@@ -25,4 +25,5 @@ for skill_dir in "$repo_root"/*; do
   install_link "$skill_dir" "$HOME/.cursor/skills/$skill_name"
   install_link "$skill_dir" "$HOME/.claude/skills/$skill_name"
   install_link "$skill_dir" "$HOME/.codex/skills/$skill_name"
+  install_link "$skill_dir" "$HOME/.agents/skills/$skill_name"
 done

@@ -46,27 +46,35 @@ When the user asks for swarm:
 
 1. Clarify only if the goal, repository scope, or safety boundary is genuinely ambiguous.
 2. Pick harness, isolation, repo mode, `baseRef`, and `maxConcurrency`.
-3. Create a workspace without launching hidden workers:
+3. Run identity preflight when lanes may commit, push, call GitHub, run in containers, or cross harness/process boundaries:
+
+```bash
+bun <skillDir>/scripts/cli.ts identity --repo <repo>
+```
+
+Use the report to decide whether `authProfile` or `gitIdentity` can be omitted, inferred from the repository, or must be chosen by the user. Ask when multiple GitHub accounts, multiple git identities, or a repo remote and git identity disagree. Require named profiles for container or cross-harness CLI lanes that need credentials.
+
+4. Create a workspace without launching hidden workers:
 
 ```bash
 bun <skillDir>/scripts/cli.ts init "<goal>" --executor <executor> --isolation <mode>
 ```
 
-4. Write `.swarm/<rootSlug>/plan.json` in the parent conversation using the planner contract below.
-5. Prepare each ready task:
+5. Write `.swarm/<rootSlug>/plan.json` in the parent conversation using the planner contract below.
+6. Prepare each ready task:
 
 ```bash
 bun <skillDir>/scripts/cli.ts prepare .swarm/<rootSlug> <task>
 ```
 
-6. Read the returned `promptPath`, `launch`, `launchPlan`, `isolation`, `authProfile`, and `gitIdentity`, then launch the lane through the selected harness adapter. For command-backed CLI lanes, `swarm launch` can execute the returned command plan.
-7. After the worker writes `.swarm/<rootSlug>/handoffs/<task>.md`, record it:
+7. Read the returned `promptPath`, `launch`, `launchPlan`, `isolation`, `authProfile`, and `gitIdentity`, then launch the lane through the selected harness adapter. For command-backed CLI lanes, `swarm launch` can execute the returned command plan.
+8. After the worker writes `.swarm/<rootSlug>/handoffs/<task>.md`, record it:
 
 ```bash
 bun <skillDir>/scripts/cli.ts complete .swarm/<rootSlug> <task>
 ```
 
-8. Inspect progress with `tree`, `status`, `inbox`, and handoffs.
+9. Inspect progress with `tree`, `status`, `inbox`, and handoffs.
 
 ## Planner Contract
 
@@ -115,6 +123,14 @@ The root planner writes `.swarm/<rootSlug>/plan.json`:
 ```
 
 Prefer fewer, broader workers. Add verifiers only when independent checking has real value. Use task-level `authProfile`, `gitIdentity`, `executor`, or `isolation` only when a lane needs to differ from the plan default.
+
+Identity rules:
+
+- Omit `authProfile` only when ambient auth is intended and the lane stays in the current host/process boundary.
+- Set `authProfile` when a lane needs GitHub/API credentials in a container, another harness CLI, or another account context.
+- Omit `gitIdentity` only when repository git config clearly resolves to the intended author identity.
+- Set `gitIdentity` when the repository has no clear git identity, multiple identities are configured, or the task must commit as a specific account.
+- Never resolve ambiguity by guessing. Ask the user to choose a named profile.
 
 ## Handoff Contract
 

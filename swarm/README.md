@@ -23,6 +23,7 @@ Default install locations:
 - Cursor: `~/.cursor/skills/swarm`
 - Claude Code: `~/.claude/skills/swarm`
 - Codex CLI: `~/.codex/skills/swarm`
+- Pi-compatible agents: `~/.agents/skills/swarm`
 
 The install script creates symlinks to each skill folder, so edits in `~/.skills/<skill>` update all hosts.
 
@@ -79,6 +80,14 @@ git/thomas-work.gitconfig
 ```
 
 Auth env files can define `GH_TOKEN`, `GITHUB_TOKEN`, or any derivative token needed by the selected harness. Git identity files use normal git config syntax.
+
+Inspect non-secret identity state before writing a plan that commits, pushes, uses GitHub, runs in containers, or crosses harness boundaries:
+
+```bash
+bun <skillDir>/scripts/cli.ts identity --repo <repo>
+```
+
+The identity report shows repository git identity, GitHub CLI account state, local swarm profiles, and recommendations. It never prints tokens. Use named profiles when the report finds multiple accounts, multiple git identities, missing repo identity, or credentials that need to cross into a container or another harness process.
 
 ## Common Commands
 

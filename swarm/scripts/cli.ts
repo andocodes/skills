@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
 import { authDoctor } from "./src/auth.ts";
+import { identityDoctor } from "./src/identity.ts";
 import { buildImage, imagePresetDescription, parseImagePreset } from "./src/images.ts";
 import { SwarmManager } from "./src/manager.ts";
 import {
@@ -31,6 +32,20 @@ program
     const result = await authDoctor();
     console.log(JSON.stringify(result, null, 2));
     process.exitCode = result.ok ? 0 : 1;
+  });
+
+program
+  .command("identity")
+  .description("Inspect non-secret git, GitHub, and swarm profile identity state")
+  .option("--repo <path>", "Repository path to inspect", process.cwd())
+  .option("--github-host <host>", "GitHub hostname to inspect", "github.com")
+  .action(options => {
+    const result = identityDoctor({
+      cwd: process.cwd(),
+      repo: options.repo,
+      githubHost: options.githubHost,
+    });
+    console.log(JSON.stringify(result, null, 2));
   });
 
 const image = program.command("image").description("Build swarm agent container images");

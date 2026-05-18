@@ -26,7 +26,7 @@ Existing non-matching files or links are left untouched.
 | Skill | Use it for |
 | --- | --- |
 | `clarify` | Simplifying and standardising code while preserving behavior. |
-| `document` | Writing concise, verified project documentation. |
+| `distill` | Turning messy context into concise, verified reader-ready material. |
 | `illustrate` | Making concepts concrete with examples, contrasts, and small diagrams. |
 | `probe` | Pressure-testing plans with focused questions and a visible decision path. |
 | `swarm` | Orchestrating explicit multi-agent work through lanes, adapters, state, and handoffs. |

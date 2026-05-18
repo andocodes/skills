@@ -1,0 +1,4 @@
+interface:
+  display_name: "Distill"
+  short_description: "Distill context into concise output"
+  default_prompt: "Use $distill to turn this context into concise, verified reader-ready material."

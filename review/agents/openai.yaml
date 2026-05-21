@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review"
+  short_description: "Review code with severity-first findings"
+  default_prompt: "Use $review to inspect these changes and return severity-first findings."

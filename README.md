@@ -29,6 +29,7 @@ Existing non-matching files or links are left untouched.
 | `distill` | Turning messy context into concise, verified reader-ready material. |
 | `illustrate` | Making concepts concrete with examples, contrasts, and small diagrams. |
 | `probe` | Pressure-testing plans with focused questions and a visible decision path. |
+| `review` | Reviewing code with severity-first, source-grounded findings. |
 | `swarm` | Orchestrating explicit multi-agent work through lanes, adapters, state, and handoffs. |
 
 ## Checks

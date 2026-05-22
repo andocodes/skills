@@ -11,10 +11,11 @@ Swarm is a portable local orchestration contract. It decomposes a large goal int
 
 1. Invoke swarm only when the user explicitly names swarm.
 2. Keep the root planner in the parent conversation. The planner writes `plan.json`; it does not implement code.
-3. Give every task a durable git branch and a bounded workspace, even when the execution sandbox is a container.
+3. Give every lane a durable git branch and bounded worktree, even when the execution sandbox is a container. If a repo is touched by two or more lanes, each lane must use its own worktree.
 4. Keep worker communication parent-mediated through handoffs and inbox notes. Do not create sibling-to-sibling chat.
 5. Use named auth and git identity profiles only. Never inline tokens, keys, or secret values in `plan.json`, prompts, handoffs, or logs.
-6. Do not merge, push, open PRs, or perform destructive cleanup unless the user explicitly asks.
+6. Treat `maxConcurrency` as the number of worker/verifier subagents allowed at once. The root planner is not part of that budget.
+7. Do not merge, push, open PRs, or perform destructive cleanup unless the user explicitly asks.
 
 ## Adapter Model
 
@@ -45,7 +46,7 @@ The durable boundary is still git: each non-readonly lane works on `swarm/<rootS
 When the user asks for swarm:
 
 1. Clarify only if the goal, repository scope, or safety boundary is genuinely ambiguous.
-2. Pick harness, isolation, repo mode, `baseRef`, and `maxConcurrency`.
+2. Pick harness, isolation, repo mode, `baseRef`, and `maxConcurrency` as a subagent lane budget.
 3. Run identity preflight when lanes may commit, push, call GitHub, run in containers, or cross harness/process boundaries:
 
 ```bash
@@ -61,7 +62,7 @@ bun <skillDir>/scripts/cli.ts init "<goal>" --executor <executor> --isolation <m
 ```
 
 5. Write `.swarm/<rootSlug>/plan.json` in the parent conversation using the planner contract below.
-6. Prepare each ready task:
+6. Prepare up to `maxConcurrency` ready worker/verifier lanes:
 
 ```bash
 bun <skillDir>/scripts/cli.ts prepare .swarm/<rootSlug> <task>
@@ -122,7 +123,7 @@ The root planner writes `.swarm/<rootSlug>/plan.json`:
 }
 ```
 
-Prefer fewer, broader workers. Add verifiers only when independent checking has real value. Use task-level `authProfile`, `gitIdentity`, `executor`, or `isolation` only when a lane needs to differ from the plan default.
+Prefer fewer, broader workers. Add verifiers only when independent checking has real value. `maxConcurrency: 3` means three worker/verifier lanes may run at once, in addition to the parent planner. Use task-level `authProfile`, `gitIdentity`, `executor`, or `isolation` only when a lane needs to differ from the plan default.
 
 Identity rules:
 

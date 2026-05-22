@@ -11,6 +11,7 @@ import {
 import { requireApiKey } from "./auth.ts";
 import { branchForTask, ensureWorktree, removeWorktree, worktreePathForTask } from "./git.ts";
 import {
+  classifyHandoffStatus,
   extractFinalHandoff,
   failureHandoff,
   handoffPath,
@@ -549,11 +550,10 @@ ${isolationLaunchInstructions(taskState.isolation)}
       taskState.status = "error";
       this.attention(`${task.name}: missing structured handoff heading`);
     } else {
-      const status = parsed.status?.toLowerCase() ?? "";
-      taskState.status =
-        status.includes("failed") || status.includes("blocked") ? "error" : "handed-off";
-      if (taskState.status === "error") {
-        this.attention(`${task.name}: handoff status ${parsed.status ?? "(unknown)"}`);
+      const { accepted, reason } = classifyHandoffStatus(parsed);
+      taskState.status = accepted ? "handed-off" : "error";
+      if (!accepted) {
+        this.attention(`${task.name}: ${reason}`);
       }
     }
     this.saveState();
@@ -583,7 +583,7 @@ ${isolationLaunchInstructions(taskState.isolation)}
   }
 
   private spawnReadyTasks(taskTimeoutMs?: number): Array<{ name: string; promise: Promise<void> }> {
-    const available = Math.max(0, this.plan.maxConcurrency - this.runningCount());
+    const available = availableSubagentSlots(this.plan.maxConcurrency, this.runningCount());
     if (available === 0) return [];
     const ready = this.plan.tasks
       .filter(task => this.getTaskState(task.name).status === "pending")
@@ -726,11 +726,10 @@ ${isolationLaunchInstructions(taskState.isolation)}
       this.attention(`${task.name}: SDK run ended with ${result.status}`);
       return;
     }
-    const status = parsed.status?.toLowerCase() ?? "";
-    taskState.status =
-      status.includes("failed") || status.includes("blocked") ? "error" : "handed-off";
-    if (taskState.status === "error") {
-      this.attention(`${task.name}: handoff status ${parsed.status ?? "(unknown)"}`);
+    const { accepted, reason } = classifyHandoffStatus(parsed);
+    taskState.status = accepted ? "handed-off" : "error";
+    if (!accepted) {
+      this.attention(`${task.name}: ${reason}`);
     }
   }
 
@@ -911,6 +910,10 @@ function initialState(plan: Plan, workspace: string): State {
     tasks: plan.tasks.map(task => initialTaskState(plan, workspace, task)),
     attention: [],
   };
+}
+
+export function availableSubagentSlots(maxConcurrency: number, runningLanes: number): number {
+  return Math.max(0, maxConcurrency - runningLanes);
 }
 
 function initialTaskState(plan: Plan, workspace: string, task: PlanTask): TaskState {

@@ -34,11 +34,32 @@ export function readHandoff(workspace: string, taskName: string): string | null 
 export function parseHandoff(body: string): HandoffSummary {
   const verification = extractSection(body, "Verification");
   const status = extractSection(body, "Status");
+  const kind: "worker" | "verifier" = status ? "worker" : "verifier";
+  const source = kind === "worker" ? status : verification;
   return {
-    kind: verification && !status ? "verifier" : "worker",
-    status: firstMeaningfulLine(verification ?? status),
+    kind,
+    status: firstMeaningfulLine(source),
     branch: parseBranch(body),
     hasStructuredHandoff: Boolean(status || verification),
+  };
+}
+
+export function classifyHandoffStatus(parsed: HandoffSummary): {
+  accepted: boolean;
+  reason: string;
+} {
+  const status = parsed.status?.toLowerCase() ?? "";
+  if (parsed.kind === "worker") {
+    if (status === "success") return { accepted: true, reason: "" };
+    return {
+      accepted: false,
+      reason: `worker status must be exactly "success" (got "${parsed.status ?? "(empty)"}"); use "blocked" or "failed" to surface problems`,
+    };
+  }
+  if (status === "passed") return { accepted: true, reason: "" };
+  return {
+    accepted: false,
+    reason: `verifier status must be exactly "passed" (got "${parsed.status ?? "(empty)"}"); use "blocked" or "failed" to surface problems`,
   };
 }
 

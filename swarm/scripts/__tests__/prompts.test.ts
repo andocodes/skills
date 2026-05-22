@@ -30,6 +30,8 @@ describe("swarm prompts", () => {
     expect(prompt).toContain("isolation:");
     expect(prompt).toContain("repositories: copy the available repositories below exactly");
     expect(prompt).toContain("Available repositories:");
+    expect(prompt).toContain("the root planner is not counted");
+    expect(prompt).toContain("each one gets its own branch and worktree");
   });
 
   test("task prompt always includes the full selected agent body", () => {

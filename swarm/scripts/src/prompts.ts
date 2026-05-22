@@ -45,7 +45,7 @@ Plan contract:
 - repositories: copy the available repositories below exactly.
 - defaultRepo: ${args.defaultRepo ? `"${args.defaultRepo}"` : "omit when multiple repos are available"}.
 - baseRef: "${args.baseRef}" unless you have a strong reason to use another existing ref.
-- maxConcurrency: 1-4, default 2.
+- maxConcurrency: 1-4 worker/verifier subagent lanes at once; the root planner is not counted.
 - tasks: worker and verifier tasks with kebab-case names.
 - A task may set executor to ${executorDescription}.
 - A task may set isolation to { "mode": "worktree" }, { "mode": "container", "runtime": "docker" }, { "mode": "container", "runtime": "podman" }, or { "mode": "readonly" }. Container tasks may set readonly: true to mount the checkout read-only while still allowing handoff writes.
@@ -53,6 +53,7 @@ Plan contract:
 - In sibling repo mode, set task.repo for every task. Paths are relative to that repo.
 - Each task needs scopedGoal. Use agent when one of the available agents clearly fits.
 - Use dependsOn for ordering. Verifiers may set verifies when checking a specific worker, or omit verifies for standalone audit/check lanes.
+- When two or more lanes touch the same repo, keep them as separate lanes; each one gets its own branch and worktree.
 - Keep fan-out small and meaningful. Prefer fewer, broader workers.
 - Do not edit code. Only write plan.json.
 
@@ -143,10 +144,11 @@ Rules:
 - Keep changes scoped to this task.
 - If you need to leave a parent-mediated note, mention the exact \`swarm note\` command in your handoff. Do not attempt sibling-to-sibling chat.
 - End your final answer with the exact structured handoff below.
+- The \`## Status\` value MUST be exactly one of these three literals: \`success\`, \`blocked\`, or \`failed\`. Do not invent values like \`ready\`, \`done\`, or \`ok\` — the parent parses this strictly.
 
 Required final handoff:
 ## Status
-success | blocked | failed
+<exactly one of: success | blocked | failed>
 
 ## Branch
 \`${args.taskState.branch}\`
@@ -219,10 +221,11 @@ Rules:
 - Do not modify code unless the verifier task explicitly asks you to. Report findings.
 - If you need to leave a parent-mediated note, mention the exact \`swarm note\` command in your handoff. Do not attempt sibling-to-sibling chat.
 - End your final answer with the exact structured handoff below.
+- The first line under \`## Verification\` MUST be exactly one of these three literals: \`passed\`, \`blocked\`, or \`failed\`. Do not invent values — the parent parses this strictly.
 
 Required final handoff:
 ## Verification
-passed | failed | blocked
+<exactly one of: passed | blocked | failed>
 
 ## Branch
 \`${args.taskState.branch}\`

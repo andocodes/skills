@@ -12,7 +12,7 @@ Prefer the current harness's native adapter:
 
 Use `claude-cli`, `codex-cli`, or `pi-cli` when a parent host intentionally starts a terminal-visible lane in another harness. Use `cursor-sdk` for unattended headless runs.
 
-Always announce the chosen executor, isolation mode, repository mode, `baseRef`, and max concurrency before spawning lanes.
+Always announce the chosen executor, isolation mode, repository mode, `baseRef`, and max concurrency before spawning lanes. Max concurrency is the worker/verifier subagent budget; the parent planner is not counted.
 
 ## Visible and Native Runs
 
@@ -22,7 +22,7 @@ Create a workspace without launching hidden workers:
 bun <skillDir>/scripts/cli.ts init "<goal>" --executor <executor> --isolation <mode>
 ```
 
-The parent writes `plan.json`, prepares each ready task, and launches the returned `executor` using the returned `promptPath`:
+The parent writes `plan.json`, prepares up to `maxConcurrency` ready worker/verifier lanes, and launches the returned `executor` using the returned `promptPath`:
 
 ```bash
 bun <skillDir>/scripts/cli.ts prepare .swarm/<rootSlug> <task>
@@ -83,6 +83,7 @@ The headless SDK runner:
 - Re-reads `state.json` between sweeps.
 - Recovers persisted local SDK `runId` values when possible.
 - Spawns ready pending tasks up to `plan.maxConcurrency`.
+- Counts only worker/verifier lanes toward `plan.maxConcurrency`; the root planner never consumes a slot.
 - Writes `attention.log` when recovery, handoff, or task status needs operator review.
 - Exits with a non-zero code when any task is blocked, failed, cancelled, or still pending at checkpoint.
 - Fails tasks that stay running longer than `--task-timeout-sec`, writing a failure handoff.
@@ -124,7 +125,7 @@ The planner receives all child git repositories and should set `repo` on each ta
 }
 ```
 
-Each task gets a worktree under `.swarm/<rootSlug>/worktrees/<repo>/<task>/`, but the git branch is created inside that task's selected repository.
+Each task gets a worktree under `.swarm/<rootSlug>/worktrees/<repo>/<task>/`, but the git branch is created inside that task's selected repository. When multiple lanes target one repo, keep the per-lane worktrees; do not reuse the repo checkout as a shared scratch space.
 
 ## Working Base
 

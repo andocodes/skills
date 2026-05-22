@@ -6,7 +6,7 @@
 - `state.json` tracks task status and attention items.
 - `logs/<task>-prompt.md` is the launch prompt for a lane.
 - `handoffs/<task>.md` is the durable task result.
-- `.swarm/<rootSlug>/worktrees/<repo>/<task>/` is the default git checkout boundary.
+- `.swarm/<rootSlug>/worktrees/<repo>/<task>/` is the git checkout boundary for each lane.
 
 ## Install
 
@@ -58,6 +58,8 @@ Use the current host's native adapter by default. Use CLI adapters only when int
 - `readonly`: exploration or verification lanes that should not mutate code.
 
 The execution sandbox is not the durable artifact model. Git branches, prompts, handoffs, and state remain the source of truth for every mode.
+
+If two or more lanes touch the same repository, they still get separate worktrees under `.swarm/<rootSlug>/worktrees/<repo>/<task>/`. `maxConcurrency` counts worker/verifier lanes only, so `maxConcurrency: 3` permits three subagents in addition to the parent planner.
 
 ## Identity Profiles
 

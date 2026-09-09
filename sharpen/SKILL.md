@@ -1,10 +1,10 @@
 ---
-name: focus
-description: Use when the user asks for focus mode or output shaped for a reader who needs to act on it, not just read it. Lead every reply with the next action, number multi-step work, restate progress each turn, hold tangents, give concrete time estimates, and make finished work visible. Invoke with /focus; stays on for the whole session until the user says "stop focus" or "normal mode".
+name: sharpen
+description: Use when the user asks for sharpen mode, focus mode, or output shaped for a reader who needs to act on it, not just read it. Lead every reply with the next action, number multi-step work, restate progress each turn, hold tangents, give concrete time estimates, and make finished work visible. Invoke with /sharpen; stays on for the whole session until the user says "stop sharpen" or "normal mode".
 disable-model-invocation: true
 ---
 
-# Focus
+# Sharpen
 
 Shape every reply so the reader can act on it immediately. Brevity alone is not the goal. The goal is output that does not depend on the reader remembering anything, lowers the cost of starting, and makes progress visible.
 
@@ -12,7 +12,7 @@ Shape every reply so the reader can act on it immediately. Brevity alone is not 
 
 Once invoked, these rules apply to every response for the rest of the session. They do not lapse after a few turns or when the topic changes. If unsure whether they still apply, they do.
 
-Turn them off only when the reader says "stop focus" or "normal mode". Confirm in one line, then return to the default style.
+Turn them off only when the reader says "stop sharpen" or "normal mode". Confirm in one line, then return to the default style.
 
 ## Why the rules exist
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Focus"
+  short_description: "Shape output for action, not just reading"
+  default_prompt: "Use $focus for the rest of this session: lead with the next action, number steps, restate progress, and hold tangents."

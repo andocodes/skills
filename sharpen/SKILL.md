@@ -1,7 +1,6 @@
 ---
 name: sharpen
 description: Use when the user asks for sharpen mode, focus mode, or output shaped for a reader who needs to act on it, not just read it. Lead every reply with the next action, number multi-step work, restate progress each turn, hold tangents, give concrete time estimates, and make finished work visible. Invoke with /sharpen; stays on for the whole session until the user says "stop sharpen" or "normal mode".
-disable-model-invocation: true
 ---
 
 # Sharpen

@@ -31,6 +31,7 @@ Existing non-matching files or links are left untouched.
 | `probe` | Pressure-testing plans with focused questions and a visible decision path. |
 | `review` | Reviewing code with severity-first, source-grounded findings. |
 | `swarm` | Orchestrating explicit multi-agent work through lanes, adapters, state, and handoffs. |
+| `teach` | Socratic tutoring to demonstrated mastery, grounded in your code when relevant. |
 
 ## Checks
 

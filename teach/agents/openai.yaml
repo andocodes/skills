@@ -1,0 +1,4 @@
+interface:
+  display_name: "Teach"
+  short_description: "Socratic tutoring to demonstrated mastery"
+  default_prompt: "Use $teach to tutor me on this topic: place me with a short diagnostic, then question me one step at a time."

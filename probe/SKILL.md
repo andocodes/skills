@@ -102,4 +102,4 @@ Next move:
 
 - Use `illustrate`-style examples, option cards, or small diagrams when a branch is abstract or the user is comparing options.
 - Return to probing after the illustration. Do not let examples replace the pressure-test.
-- Use `clarify` only after probing when the user wants the resulting plan or code simplified.
+- Use `/simplify` after probing when the user wants the resulting code simplified.

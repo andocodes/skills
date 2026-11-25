@@ -25,12 +25,11 @@ Existing non-matching files or links are left untouched.
 
 | Skill | Use it for |
 | --- | --- |
-| `clarify` | Simplifying and standardising code while preserving behavior. |
+| `clarify` | Session mode shaping replies and code for action: next step first, numbered work, visible progress, no tangents. |
 | `distill` | Turning messy context into concise, verified reader-ready material. |
 | `illustrate` | Making concepts concrete with examples, contrasts, and small diagrams. |
 | `probe` | Pressure-testing plans with focused questions and a visible decision path. |
 | `review` | Reviewing code with severity-first, source-grounded findings. |
-| `sharpen` | Shaping output for action: next step first, numbered work, visible progress, no tangents. |
 | `swarm` | Orchestrating explicit multi-agent work through lanes, adapters, state, and handoffs. |
 
 ## Checks

@@ -1,4 +1,4 @@
 interface:
   display_name: "Clarify"
-  short_description: "Refine code for clarity without behavior changes"
-  default_prompt: "Use $clarify to simplify and clarify the recent code changes without changing behavior."
+  short_description: "Shape replies and code for a reader who has to act"
+  default_prompt: "Use $clarify for the rest of this session: lead with the next action, number steps, restate progress, and hold tangents."

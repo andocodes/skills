@@ -1,4 +1,0 @@
-interface:
-  display_name: "Sharpen"
-  short_description: "Shape output for action, not just reading"
-  default_prompt: "Use $sharpen for the rest of this session: lead with the next action, number steps, restate progress, and hold tangents."
